@@ -1,10 +1,12 @@
 import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, CardContent } from '@/components/native/card';
 import { nativeTheme } from '@/lib/native-theme';
 import { useColors } from '@/hooks/use-colors';
 import { ScreenHeader, ScreenShell } from '@/components/path-ui';
+import { useProgress } from '@/context/progress';
 
 const SETTINGS = [
   { icon: 'bell' as const, title: 'Reminders', detail: 'Coming soon', disabled: true },
@@ -14,6 +16,7 @@ const SETTINGS = [
 
 export default function SettingsRoute() {
   const colors = useColors();
+  const { profile, resetOnboarding } = useProgress();
 
   return (
     <ScreenShell>
@@ -47,6 +50,23 @@ export default function SettingsRoute() {
                 <Feather name={setting.disabled ? 'clock' : 'chevron-right'} size={17} color={colors.mutedForeground} />
               </Pressable>
             ))}
+            <Pressable
+              testID="restart-onboarding"
+              onPress={() => {
+                resetOnboarding();
+                router.replace('/onboarding');
+              }}
+              style={({ pressed }) => [styles.settingRow, { borderBottomColor: colors.border, opacity: pressed ? 0.68 : 1 }]}
+            >
+              <View style={[styles.settingIcon, { backgroundColor: colors.muted }]}>
+                <Feather name="refresh-cw" size={17} color={colors.foreground} />
+              </View>
+              <View style={styles.settingCopy}>
+                <Text style={[styles.settingTitle, { color: colors.foreground }]}>Retake your starting point</Text>
+                <Text style={[styles.settingDetail, { color: colors.mutedForeground }]}>{profile ? 'Update your goals and situation' : 'Build your personal path'}</Text>
+              </View>
+              <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+            </Pressable>
           </CardContent>
         </Card>
 

@@ -21,13 +21,14 @@ import {
 import { nativeTheme } from '@/lib/native-theme';
 import { useColors } from '@/hooks/use-colors';
 import type { TrackKey } from '@/context/progress';
-import { useProgress } from '@/context/progress';
+import { getTrackTasks, useProgress } from '@/context/progress';
 
 export type TrackConfig = {
   key: TrackKey;
   label: string;
   title: string;
   description: string;
+  benefit: string;
   icon: keyof typeof Feather.glyphMap;
   colorKey: 'primary' | 'secondary' | 'accent';
   tasks: Array<{ id: string; title: string; detail: string; meta: string }>;
@@ -40,6 +41,7 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
     label: 'Mind',
     title: 'Sharpen the instrument.',
     description: 'Read deeply, think clearly, and build the focus to do meaningful work.',
+    benefit: 'You become harder to distract and more capable of doing meaningful work.',
     icon: 'book-open',
     colorKey: 'primary',
     tasks: [
@@ -59,6 +61,7 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
     label: 'Body',
     title: 'Earn your energy.',
     description: 'Train, recover, and build a body that gives you more choices.',
+    benefit: 'You gain the energy and resilience to meet life on your own terms.',
     icon: 'activity',
     colorKey: 'secondary',
     tasks: [
@@ -78,6 +81,7 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
     label: 'Soul',
     title: 'Return to what matters.',
     description: 'Make space for prayer, gratitude, service, and a life larger than the feed.',
+    benefit: 'You become more grounded, generous, and connected to what matters.',
     icon: 'sun',
     colorKey: 'accent',
     tasks: [
@@ -97,6 +101,7 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
     label: 'Freedom',
     title: 'Build more room to choose.',
     description: 'Learn the skills, systems, and courage that make your time more your own.',
+    benefit: 'You create more options, ownership, and room to choose your direction.',
     icon: 'key',
     colorKey: 'primary',
     tasks: [
@@ -187,14 +192,18 @@ export function ScreenHeader({
 
 export function TaskRow({
   id,
+  track,
   title,
   detail,
   meta,
+  xp,
 }: {
   id: string;
+  track: TrackKey;
   title: string;
   detail: string;
   meta: string;
+  xp: number;
 }) {
   const colors = useColors();
   const { isComplete, toggle } = useProgress();
@@ -204,7 +213,7 @@ export function TaskRow({
       testID={`task-${id}`}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: complete }}
-      onPress={() => toggle(id)}
+      onPress={() => toggle(id, track, xp)}
       style={({ pressed }) => [
         styles.taskRow,
         { borderBottomColor: colors.border, opacity: pressed ? 0.72 : 1 },
@@ -232,7 +241,10 @@ export function TaskRow({
         </Text>
         <Text style={[styles.taskDetail, { color: colors.mutedForeground }]}>{detail}</Text>
       </View>
-      <Text style={[styles.taskMeta, { color: colors.mutedForeground }]}>{meta}</Text>
+      <View style={styles.taskMetaWrap}>
+        <Text style={[styles.taskMeta, { color: colors.mutedForeground }]}>{meta}</Text>
+        <Text style={[styles.taskXp, { color: colors.primary }]}>+{xp} XP</Text>
+      </View>
     </Pressable>
   );
 }
@@ -240,10 +252,11 @@ export function TaskRow({
 export function TrackScreen({ track }: { track: TrackKey }) {
   const colors = useColors();
   const config = TRACKS[track];
-  const { trackCompleted } = useProgress();
+  const { profile, trackCompleted } = useProgress();
   const trackColor = colors[config.colorKey] as ColorValue;
   const completed = trackCompleted(track);
   const router = useRouter();
+  const tasks = getTrackTasks(track, profile);
 
   return (
     <ScreenShell>
@@ -255,13 +268,20 @@ export function TrackScreen({ track }: { track: TrackKey }) {
           icon={config.icon}
           color={String(trackColor)}
         />
+        <View style={[styles.benefitCard, { backgroundColor: colors.secondary + '22', borderColor: colors.secondary }]}>
+          <Feather name="arrow-up-right" size={17} color={String(trackColor)} />
+          <View style={styles.benefitCopy}>
+            <Text style={[styles.benefitLabel, { color: String(trackColor) }]}>WHAT THIS BUILDS</Text>
+            <Text style={[styles.benefitText, { color: colors.foreground }]}>{config.benefit}</Text>
+          </View>
+        </View>
         <View style={styles.progressHeader}>
           <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Today’s practice</Text>
           <Text style={[styles.progressText, { color: colors.mutedForeground }]}>{completed}/3 complete</Text>
         </View>
         <Card style={{ backgroundColor: colors.card }}>
           <CardContent style={styles.taskList}>
-            {config.tasks.map((task) => <TaskRow key={task.id} {...task} />)}
+            {tasks.map((task) => <TaskRow key={task.id} {...task} />)}
           </CardContent>
         </Card>
 
@@ -321,6 +341,8 @@ const styles = StyleSheet.create({
   taskTitle: { fontFamily: nativeTheme.typography.sans.semibold, fontSize: 14 },
   taskDetail: { fontFamily: nativeTheme.typography.sans.regular, fontSize: 12, lineHeight: 17 },
   taskMeta: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 10, letterSpacing: 0.8 },
+  taskMetaWrap: { alignItems: 'flex-end', gap: 4 },
+  taskXp: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 10 },
   resourceCard: { marginTop: nativeTheme.spacing.xl, borderWidth: 0 },
   resourceContent: { flexDirection: 'row', alignItems: 'center', gap: nativeTheme.spacing.md, paddingTop: 4 },
   resourceIcon: { width: 42, height: 42, borderRadius: nativeTheme.radius.md, alignItems: 'center', justifyContent: 'center' },
@@ -328,6 +350,10 @@ const styles = StyleSheet.create({
   resourceTitle: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 16 },
   resourceDetail: { fontFamily: nativeTheme.typography.sans.regular, fontSize: 12, lineHeight: 18, opacity: 0.74 },
   nextStep: { marginTop: nativeTheme.spacing.xxl, gap: nativeTheme.spacing.sm },
+  benefitCard: { flexDirection: 'row', alignItems: 'flex-start', gap: nativeTheme.spacing.md, borderWidth: 1, borderRadius: nativeTheme.radius.lg, padding: nativeTheme.spacing.md, marginBottom: nativeTheme.spacing.xl },
+  benefitCopy: { flex: 1, gap: 4 },
+  benefitLabel: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 10, letterSpacing: 1.3 },
+  benefitText: { fontFamily: nativeTheme.typography.sans.medium, fontSize: 13, lineHeight: 19 },
   bodyCopy: { fontFamily: nativeTheme.typography.sans.regular, fontSize: 14, lineHeight: 21 },
   nextButton: { alignSelf: 'flex-start', marginTop: nativeTheme.spacing.sm },
 });

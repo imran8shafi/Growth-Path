@@ -7,21 +7,16 @@ import { Card, CardContent, CardHeader } from '@/components/native/card';
 import { nativeTheme } from '@/lib/native-theme';
 import { useColors } from '@/hooks/use-colors';
 import { ScreenShell, TaskRow, TRACKS } from '@/components/path-ui';
-import { useProgress } from '@/context/progress';
-
-const HOME_TASKS = [
-  { id: 'mind-read', title: 'Read for 20 minutes', detail: 'Sharpen your attention.', meta: 'MIND' },
-  { id: 'body-move', title: 'Complete today’s training', detail: 'Earn your energy.', meta: 'BODY' },
-  { id: 'soul-prayer', title: 'Practice stillness or prayer', detail: 'Return to what matters.', meta: 'SOUL' },
-  { id: 'freedom-build', title: 'Ship one small asset', detail: 'Build more room to choose.', meta: 'FREEDOM' },
-];
+import { getDailyQuests, useProgress } from '@/context/progress';
 
 export function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { completed, isComplete } = useProgress();
-  const doneToday = HOME_TASKS.filter((task) => isComplete(task.id)).length;
-  const progress = doneToday / HOME_TASKS.length;
+  const { profile, totalXp, level, levelProgress, isComplete } = useProgress();
+  const homeTasks = getDailyQuests(profile);
+  const doneToday = homeTasks.filter((task) => isComplete(task.id)).length;
+  const progress = doneToday / homeTasks.length;
+  const allComplete = doneToday === homeTasks.length;
 
   return (
     <ScreenShell>
@@ -32,20 +27,20 @@ export function HomeScreen() {
             <Text style={[styles.greeting, { color: colors.foreground }]}>Your path, today.</Text>
           </View>
           <View style={[styles.dayMark, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.dayNumber, { color: colors.primaryForeground }]}>08</Text>
-            <Text style={[styles.dayLabel, { color: colors.primaryForeground }]}>AUG</Text>
+            <Text style={[styles.dayNumber, { color: colors.primaryForeground }]}>LV {level}</Text>
+            <Text style={[styles.dayLabel, { color: colors.primaryForeground }]}>{totalXp} XP</Text>
           </View>
         </View>
 
         <View style={[styles.hero, { backgroundColor: colors.sidebar }]}>
           <View style={styles.heroTop}>
             <View style={styles.heroCopy}>
-              <Badge>Day 01 · Foundation</Badge>
+              <Badge>{allComplete ? 'Daily reward unlocked' : `Level ${level} · Foundation`}</Badge>
               <Text style={[styles.heroTitle, { color: colors.sidebarForeground }]}>
-                Become harder to distract.
+                {allComplete ? 'You kept all four promises.' : 'Become better in every direction.'}
               </Text>
               <Text style={[styles.heroDetail, { color: colors.sidebarForeground }]}>
-                Four small promises. One better direction.
+                {allComplete ? 'A complete day earns +50 bonus XP and builds your identity.' : 'Four attributes. One better person.'}
               </Text>
             </View>
             <Feather name="compass" size={48} color={colors.primary} />
@@ -55,21 +50,21 @@ export function HomeScreen() {
           </View>
           <View style={styles.progressFooter}>
             <Text style={[styles.progressLabel, { color: colors.sidebarForeground }]}>
-              {doneToday} of {HOME_TASKS.length} practices complete
+              {doneToday} of {homeTasks.length} quests complete
             </Text>
             <Text style={[styles.progressLabel, { color: colors.primary }]}>
-              {completed.length} total
+              {Math.round(levelProgress * 250)} / 250 XP
             </Text>
           </View>
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Today’s four</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Today’s quests</Text>
           <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>ONE STEP EACH</Text>
         </View>
         <Card style={{ backgroundColor: colors.card }}>
           <CardContent style={styles.taskList}>
-            {HOME_TASKS.map((task) => <TaskRow key={task.id} {...task} />)}
+            {homeTasks.map((task) => <TaskRow key={task.id} {...task} />)}
           </CardContent>
         </Card>
 
@@ -92,7 +87,7 @@ export function HomeScreen() {
                   <Feather name={track.icon} size={18} color={key === 'body' ? colors.foreground : colors.primaryForeground} />
                 </View>
                 <Text style={[styles.trackLabel, { color: colors.foreground }]}>{track.label}</Text>
-                <Text style={[styles.trackDescription, { color: colors.mutedForeground }]} numberOfLines={2}>{track.description}</Text>
+                <Text style={[styles.trackDescription, { color: colors.mutedForeground }]} numberOfLines={3}>{track.benefit}</Text>
                 <View style={styles.trackArrow}>
                   <Feather name="arrow-up-right" size={16} color={colors.mutedForeground} />
                 </View>
