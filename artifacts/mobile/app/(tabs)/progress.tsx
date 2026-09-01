@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { ProgressBar, XPBar } from '@/components/native/progress';
 import { Badge } from '@/components/native/badge';
 import { Card, CardContent } from '@/components/native/card';
 import { nativeTheme } from '@/lib/native-theme';
@@ -46,6 +47,8 @@ export default function ProgressRoute() {
         <View style={[styles.levelTrack, { backgroundColor: colors.muted }]}>
           <View style={[styles.levelFill, { backgroundColor: colors.primary, width: `${Math.max(levelProgress * 100, 2)}%` }]} />
         </View>
+
+        <XPBar currentXP={totalXp} level={level} />
 
         <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: nativeTheme.spacing.xxl }]}>Your four attributes</Text>
         <Card style={{ backgroundColor: colors.card }}>

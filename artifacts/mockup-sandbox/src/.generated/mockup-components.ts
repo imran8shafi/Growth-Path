@@ -5,7 +5,6 @@ export const modules: ModuleMap = {
   "./components/mockups/onboarding/steps/EquipmentAccessStep.tsx": () => import("../components/mockups/onboarding/steps/EquipmentAccessStep.tsx"),
   "./components/mockups/onboarding/steps/ExperienceLevelStep.tsx": () => import("../components/mockups/onboarding/steps/ExperienceLevelStep.tsx"),
   "./components/mockups/onboarding/steps/FitnessGoalStep.tsx": () => import("../components/mockups/onboarding/steps/FitnessGoalStep.tsx"),
-  "./components/mockups/onboarding/steps/PersonalInfoStep.tsx": () => import("../components/mockups/onboarding/steps/PersonalInfoStep.tsx"),
   "./components/mockups/onboarding/steps/WorkoutDurationStep.tsx": () => import("../components/mockups/onboarding/steps/WorkoutDurationStep.tsx"),
   "./components/mockups/onboarding/steps/WorkoutFrequencyStep.tsx": () => import("../components/mockups/onboarding/steps/WorkoutFrequencyStep.tsx")
 };

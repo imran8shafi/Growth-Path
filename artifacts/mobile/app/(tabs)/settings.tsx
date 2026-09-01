@@ -1,7 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { Badge } from '@/components/native/badge';
+import { Button } from '@/components/native/button';
 import { Card, CardContent } from '@/components/native/card';
 import { nativeTheme } from '@/lib/native-theme';
 import { useColors } from '@/hooks/use-colors';
@@ -11,7 +13,7 @@ import { useProgress } from '@/context/progress';
 const SETTINGS = [
   { icon: 'bell' as const, title: 'Reminders', detail: 'Coming soon', disabled: true },
   { icon: 'moon' as const, title: 'Appearance', detail: 'Follows your device', disabled: false },
-  { icon: 'info' as const, title: 'About Jack Of All', detail: 'A practical path to a well-rounded life', disabled: false },
+  { icon: 'info' as const, title: 'About Growth Path', detail: 'A practical path to a well-rounded life', disabled: false },
 ];
 
 export default function SettingsRoute() {
@@ -77,7 +79,7 @@ export default function SettingsRoute() {
           <View style={styles.localCopy}>
             <Text style={[styles.localTitle, { color: colors.sidebarForeground }]}>Your progress stays on this device.</Text>
             <Text style={[styles.localDetail, { color: colors.sidebarForeground }]}>
-              Jack Of All is local-first for now. No account or connection is needed to keep your practice.
+              Growth Path is local-first for now. No account or connection is needed to keep your practice.
             </Text>
           </View>
         </View>

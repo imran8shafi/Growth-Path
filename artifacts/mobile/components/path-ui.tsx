@@ -31,7 +31,7 @@ export type TrackConfig = {
   benefit: string;
   icon: keyof typeof Feather.glyphMap;
   colorKey: 'primary' | 'secondary' | 'accent';
-  tasks: Array<{ id: string; title: string; detail: string; meta: string }>;
+  tasks: Array<{ id: string; title: string; detail: string; meta: string; xp: number; trackColor: string; trackIcon: string }>;
   resource?: { eyebrow: string; title: string; detail: string; icon: keyof typeof Feather.glyphMap };
 };
 
@@ -45,9 +45,9 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
     icon: 'book-open',
     colorKey: 'primary',
     tasks: [
-      { id: 'mind-read', title: 'Read for 20 minutes', detail: 'Deep work begins with attention.', meta: '20 MIN' },
-      { id: 'mind-journal', title: 'Write one clear thought', detail: 'Name what you are learning or avoiding.', meta: '5 MIN' },
-      { id: 'mind-learn', title: 'Study a useful skill', detail: 'Choose something that compounds.', meta: '25 MIN' },
+      { id: 'mind-read', title: 'Read for 20 minutes', detail: 'Deep work begins with attention.', meta: '20 MIN', xp: 35, trackColor: '#D97745', trackIcon: 'book-open' },
+      { id: 'mind-journal', title: 'Write one clear thought', detail: 'Name what you are learning or avoiding.', meta: '5 MIN', xp: 30, trackColor: '#D97745', trackIcon: 'book-open' },
+      { id: 'mind-learn', title: 'Study a useful skill', detail: 'Choose something that compounds.', meta: '25 MIN', xp: 45, trackColor: '#D97745', trackIcon: 'book-open' },
     ],
     resource: {
       eyebrow: 'On your shelf',
@@ -65,12 +65,12 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
     icon: 'activity',
     colorKey: 'secondary',
     tasks: [
-      { id: 'body-move', title: 'Complete today’s training', detail: 'Push, pull, squat, hinge, carry, or walk.', meta: '30 MIN' },
-      { id: 'body-recover', title: 'Get outside and breathe', detail: 'Light, air, and an unhurried pace.', meta: '10 MIN' },
-      { id: 'body-sleep', title: 'Protect your sleep window', detail: 'Set tomorrow up before tonight ends.', meta: 'RITUAL' },
+      { id: 'body-move', title: 'Complete today\'s training', detail: 'Push, pull, squat, hinge, carry, or walk.', meta: '30 MIN', xp: 40, trackColor: '#8FA58A', trackIcon: 'activity' },
+      { id: 'body-recover', title: 'Get outside and breathe', detail: 'Light, air, and an unhurried pace.', meta: '10 MIN', xp: 30, trackColor: '#8FA58A', trackIcon: 'activity' },
+      { id: 'body-sleep', title: 'Protect your sleep window', detail: 'Set tomorrow up before tonight ends.', meta: 'RITUAL', xp: 35, trackColor: '#8FA58A', trackIcon: 'activity' },
     ],
     resource: {
-      eyebrow: 'Today’s plan',
+      eyebrow: 'Today\'s plan',
       title: 'Foundation circuit',
       detail: '3 rounds · Push-ups · Rows · Split squats · Hollow hold',
       icon: 'trending-up',
@@ -85,9 +85,9 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
     icon: 'sun',
     colorKey: 'accent',
     tasks: [
-      { id: 'soul-prayer', title: 'Practice stillness or prayer', detail: 'Use the language and tradition that grounds you.', meta: '10 MIN' },
-      { id: 'soul-gratitude', title: 'Name three gifts', detail: 'Attention changes what becomes visible.', meta: '3 LINES' },
-      { id: 'soul-serve', title: 'Make someone’s day lighter', detail: 'A message, an act, or your full presence.', meta: 'ONE ACT' },
+      { id: 'soul-prayer', title: 'Practice stillness or prayer', detail: 'Use the language and tradition that grounds you.', meta: '10 MIN', xp: 35, trackColor: '#E8B45B', trackIcon: 'sun' },
+      { id: 'soul-gratitude', title: 'Name three gifts', detail: 'Attention changes what becomes visible.', meta: '3 LINES', xp: 30, trackColor: '#E8B45B', trackIcon: 'sun' },
+      { id: 'soul-serve', title: 'Make someone\'s day lighter', detail: 'A message, an act, or your full presence.', meta: 'ONE ACT', xp: 40, trackColor: '#E8B45B', trackIcon: 'sun' },
     ],
     resource: {
       eyebrow: 'A daily question',
@@ -105,9 +105,9 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
     icon: 'key',
     colorKey: 'primary',
     tasks: [
-      { id: 'freedom-audit', title: 'Audit one recurring expense', detail: 'Keep more of what your effort creates.', meta: '10 MIN' },
-      { id: 'freedom-build', title: 'Ship one small asset', detail: 'A useful offer, page, system, or conversation.', meta: '45 MIN' },
-      { id: 'freedom-learn', title: 'Study a freedom skill', detail: 'Sales, writing, code, investing, or craft.', meta: '25 MIN' },
+      { id: 'freedom-audit', title: 'Audit one recurring expense', detail: 'Keep more of what your effort creates.', meta: '10 MIN', xp: 35, trackColor: '#D97745', trackIcon: 'key' },
+      { id: 'freedom-build', title: 'Ship one small asset', detail: 'A useful offer, page, system, or conversation.', meta: '45 MIN', xp: 50, trackColor: '#D97745', trackIcon: 'key' },
+      { id: 'freedom-learn', title: 'Study a freedom skill', detail: 'Sales, writing, code, investing, or craft.', meta: '25 MIN', xp: 45, trackColor: '#D97745', trackIcon: 'key' },
     ],
     resource: {
       eyebrow: 'Principle',
@@ -197,6 +197,10 @@ export function TaskRow({
   detail,
   meta,
   xp,
+  trackColor,
+  trackIcon,
+  onPress,
+  isComplete: completeProp,
 }: {
   id: string;
   track: TrackKey;
@@ -204,16 +208,21 @@ export function TaskRow({
   detail: string;
   meta: string;
   xp: number;
+  trackColor: string;
+  trackIcon: string;
+  onPress?: () => void;
+  isComplete?: boolean;
 }) {
   const colors = useColors();
   const { isComplete, toggle } = useProgress();
-  const complete = isComplete(id);
+  const complete = completeProp ?? isComplete(id);
+
   return (
     <Pressable
       testID={`task-${id}`}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: complete }}
-      onPress={() => toggle(id, track, xp)}
+      onPress={onPress ?? (() => toggle(id, track, xp))}
       style={({ pressed }) => [
         styles.taskRow,
         { borderBottomColor: colors.border, opacity: pressed ? 0.72 : 1 },
@@ -223,12 +232,12 @@ export function TaskRow({
         style={[
           styles.check,
           {
-            borderColor: complete ? colors.primary : colors.border,
-            backgroundColor: complete ? colors.primary : 'transparent',
+            borderColor: complete ? trackColor : colors.border,
+            backgroundColor: complete ? trackColor : 'transparent',
           },
         ]}
       >
-        {complete ? <Feather name="check" size={15} color={colors.primaryForeground} /> : null}
+        {complete && <Feather name="check" size={15} color={complete ? (trackColor === '#8FA58A' ? colors.foreground : colors.primaryForeground) : 'transparent'} />}
       </View>
       <View style={styles.taskCopy}>
         <Text
@@ -243,7 +252,7 @@ export function TaskRow({
       </View>
       <View style={styles.taskMetaWrap}>
         <Text style={[styles.taskMeta, { color: colors.mutedForeground }]}>{meta}</Text>
-        <Text style={[styles.taskXp, { color: colors.primary }]}>+{xp} XP</Text>
+        <Badge tone="xp" size="sm">+{xp} XP</Badge>
       </View>
     </Pressable>
   );
@@ -276,7 +285,7 @@ export function TrackScreen({ track }: { track: TrackKey }) {
           </View>
         </View>
         <View style={styles.progressHeader}>
-          <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Today’s practice</Text>
+          <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Today's practice</Text>
           <Text style={[styles.progressText, { color: colors.mutedForeground }]}>{completed}/3 complete</Text>
         </View>
         <Card style={{ backgroundColor: colors.card }}>

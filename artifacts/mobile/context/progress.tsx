@@ -25,6 +25,8 @@ export type Quest = {
   detail: string;
   meta: string;
   xp: number;
+  trackColor: string;
+  trackIcon: string;
 };
 
 type StoredState = {
@@ -34,6 +36,7 @@ type StoredState = {
   completedDates?: string[];
   lastActiveDate?: string;
   profile?: OnboardingProfile | null;
+  lastLevelUp?: number | null;
   // Legacy field from the original local-first tracker.
   completed?: string[];
 };
@@ -45,6 +48,7 @@ type ProgressState = {
   completedDates: string[];
   lastActiveDate: string;
   profile: OnboardingProfile | null;
+  lastLevelUp: number | null;
 };
 
 type ProgressContextValue = {
@@ -63,6 +67,8 @@ type ProgressContextValue = {
   trackCompleted: (track: TrackKey) => number;
   trackXp: (track: TrackKey) => number;
   achievements: string[];
+  lastLevelUp: number | null;
+  clearLevelUp: () => void;
 };
 
 const STORAGE_KEY = '@jack-of-all/progression';
@@ -107,7 +113,22 @@ export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null
   const timeLabel = current.time === 'ten' ? '10 MIN' : current.time === 'forty' ? '40 MIN' : '20 MIN';
   const effortLabel = current.ability === 'starting' ? 'STARTER' : current.ability === 'advanced' ? 'DEEPEN' : 'BUILD';
 
-  const tasks: Record<TrackKey, Quest[]> = {
+  // Track colors for UI
+  const trackColors: Record<TrackKey, string> = {
+    mind: '#D97745',
+    body: '#8FA58A',
+    soul: '#E8B45B',
+    freedom: '#D97745',
+  };
+
+  const trackIcons: Record<TrackKey, keyof typeof import('@expo/vector-icons').Feather.glyphMap> = {
+    mind: 'book-open',
+    body: 'activity',
+    soul: 'sun',
+    freedom: 'key',
+  };
+
+const tasks: Record<TrackKey, Quest[]> = {
     mind: [
       {
         id: 'mind-read',
@@ -116,21 +137,25 @@ export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null
         detail: 'Train the attention that makes meaningful work possible.',
         meta: timeLabel,
         xp: current.ability === 'advanced' ? 45 : 35,
+        trackColor: trackColors.mind,
+        trackIcon: trackIcons.mind,
       },
-      { id: 'mind-journal', track, title: 'Write one clear thought', detail: 'Name what you are learning or avoiding.', meta: '5 MIN', xp: 30 },
-      { id: 'mind-learn', track, title: 'Study a useful skill', detail: 'Choose something that compounds.', meta: effortLabel, xp: 45 },
+      { id: 'mind-journal', track, title: 'Write one clear thought', detail: 'Name what you are learning or avoiding.', meta: '5 MIN', xp: 30, trackColor: trackColors.mind, trackIcon: trackIcons.mind },
+      { id: 'mind-learn', track, title: 'Study a useful skill', detail: 'Choose something that compounds.', meta: effortLabel, xp: 45, trackColor: trackColors.mind, trackIcon: trackIcons.mind },
     ],
     body: [
       {
         id: 'body-move',
         track,
-        title: current.equipment === 'gym' ? 'Complete today’s training' : 'Move with intention',
+        title: current.equipment === 'gym' ? 'Complete today\'s training' : 'Move with intention',
         detail: current.equipment === 'none' ? 'Walk, stretch, or train with your bodyweight.' : 'Push, pull, squat, hinge, carry, or walk.',
         meta: current.time === 'ten' ? '10 MIN' : '30 MIN',
         xp: current.ability === 'advanced' ? 50 : 40,
+        trackColor: trackColors.body,
+        trackIcon: trackIcons.body,
       },
-      { id: 'body-recover', track, title: 'Get outside and breathe', detail: 'Light, air, and an unhurried pace.', meta: '10 MIN', xp: 30 },
-      { id: 'body-sleep', track, title: 'Protect your sleep window', detail: 'Set tomorrow up before tonight ends.', meta: 'RITUAL', xp: 35 },
+      { id: 'body-recover', track, title: 'Get outside and breathe', detail: 'Light, air, and an unhurried pace.', meta: '10 MIN', xp: 30, trackColor: trackColors.body, trackIcon: trackIcons.body },
+      { id: 'body-sleep', track, title: 'Protect your sleep window', detail: 'Set tomorrow up before tonight ends.', meta: 'RITUAL', xp: 35, trackColor: trackColors.body, trackIcon: trackIcons.body },
     ],
     soul: [
       {
@@ -140,9 +165,11 @@ export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null
         detail: current.beliefs === 'faith' ? 'Use the tradition and language that grounds you.' : 'Make space for what is deeper than the feed.',
         meta: '10 MIN',
         xp: 35,
+        trackColor: trackColors.soul,
+        trackIcon: trackIcons.soul,
       },
-      { id: 'soul-gratitude', track, title: 'Name three gifts', detail: 'Attention changes what becomes visible.', meta: '3 LINES', xp: 30 },
-      { id: 'soul-serve', track, title: 'Make someone’s day lighter', detail: 'A message, an act, or your full presence.', meta: 'ONE ACT', xp: 40 },
+      { id: 'soul-gratitude', track, title: 'Name three gifts', detail: 'Attention changes what becomes visible.', meta: '3 LINES', xp: 30, trackColor: trackColors.soul, trackIcon: trackIcons.soul },
+      { id: 'soul-serve', track, title: 'Make someone\'s day lighter', detail: 'A message, an act, or your full presence.', meta: 'ONE ACT', xp: 40, trackColor: trackColors.soul, trackIcon: trackIcons.soul },
     ],
     freedom: [
       {
@@ -152,9 +179,11 @@ export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null
         detail: 'Keep more of what your effort creates.',
         meta: '10 MIN',
         xp: 35,
+        trackColor: trackColors.freedom,
+        trackIcon: trackIcons.freedom,
       },
-      { id: 'freedom-build', track, title: 'Ship one small asset', detail: 'A useful offer, page, system, or conversation.', meta: '45 MIN', xp: 50 },
-      { id: 'freedom-learn', track, title: 'Study a freedom skill', detail: 'Sales, writing, code, investing, or craft.', meta: effortLabel, xp: 45 },
+      { id: 'freedom-build', track, title: 'Ship one small asset', detail: 'A useful offer, page, system, or conversation.', meta: '45 MIN', xp: 50, trackColor: trackColors.freedom, trackIcon: trackIcons.freedom },
+      { id: 'freedom-learn', track, title: 'Study a freedom skill', detail: 'Sales, writing, code, investing, or craft.', meta: effortLabel, xp: 45, trackColor: trackColors.freedom, trackIcon: trackIcons.freedom },
     ],
   };
 
@@ -175,6 +204,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     completedDates: [],
     lastActiveDate: todayKey(),
     profile: null,
+    lastLevelUp: null,
   });
   const [hydrated, setHydrated] = useState(false);
 
@@ -193,13 +223,14 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
           completedDates: parsed.completedDates ?? [],
           lastActiveDate: today,
           profile: parsed.profile ?? null,
+          lastLevelUp: parsed.lastLevelUp ?? null,
         });
       })
       .catch(() => undefined)
       .finally(() => setHydrated(true));
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     if (hydrated) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => undefined);
   }, [hydrated, state]);
 
@@ -222,20 +253,26 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
             ? current.completedToday.filter((item) => item !== id)
             : [...current.completedToday, id];
           const dailyReward = !exists && current.completedToday.length === 3 ? 50 : 0;
-          const nextXp = Math.max(0, current.xpByTrack[track] + (exists ? -xp : xp + dailyReward));
+          const xpChange = exists ? -xp : xp + dailyReward;
+          const previousTotalXp = Object.values(current.xpByTrack).reduce((sum, xp) => sum + xp, 0);
+          const nextTotalXp = previousTotalXp + xpChange;
+          const previousLevel = Math.floor(previousTotalXp / 250) + 1;
+          const nextLevel = Math.floor(nextTotalXp / 250) + 1;
+          const leveledUp = nextLevel > previousLevel;
           const date = todayKey();
           const completedDates = exists
             ? current.completedDates
             : current.completedDates.includes(date)
-              ? current.completedDates
-              : [...current.completedDates, date];
+            ? current.completedDates
+            : [...current.completedDates, date];
           return {
             ...current,
             completedToday,
             totalCompleted: Math.max(0, current.totalCompleted + (exists ? -1 : 1)),
-            xpByTrack: { ...current.xpByTrack, [track]: nextXp },
+            xpByTrack: { ...current.xpByTrack, [track]: Math.max(0, current.xpByTrack[track] + xpChange) },
             completedDates,
             lastActiveDate: date,
+            lastLevelUp: leveledUp ? nextLevel : current.lastLevelUp,
           };
         });
       },
@@ -254,6 +291,8 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
         ...(currentStreak >= 3 ? ['Three-day momentum'] : []),
         ...(totalXp >= 500 ? ['Becoming consistent'] : []),
       ],
+      lastLevelUp: state.lastLevelUp,
+      clearLevelUp: () => setState((current) => ({ ...current, lastLevelUp: null })),
     };
   }, [hydrated, state]);
 

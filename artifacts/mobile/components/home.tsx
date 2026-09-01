@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Badge } from '@/components/native/badge';
-import { Card, CardContent, CardHeader } from '@/components/native/card';
+import { Button } from '@/components/native/button';
+import { Card, CardContent } from '@/components/native/card';
 import { nativeTheme } from '@/lib/native-theme';
 import { useColors } from '@/hooks/use-colors';
 import { ScreenShell, TaskRow, TRACKS } from '@/components/path-ui';
@@ -23,7 +24,7 @@ export function HomeScreen() {
       <View style={styles.pagePadding}>
         <View style={styles.topBar}>
           <View>
-            <Text style={[styles.eyebrow, { color: colors.primary }]}>JACK OF ALL</Text>
+            <Text style={[styles.eyebrow, { color: colors.primary }]}>GROWTH PATH</Text>
             <Text style={[styles.greeting, { color: colors.foreground }]}>Your path, today.</Text>
           </View>
           <View style={[styles.dayMark, { backgroundColor: colors.primary }]}>
@@ -35,7 +36,7 @@ export function HomeScreen() {
         <View style={[styles.hero, { backgroundColor: colors.sidebar }]}>
           <View style={styles.heroTop}>
             <View style={styles.heroCopy}>
-              <Badge>{allComplete ? 'Daily reward unlocked' : `Level ${level} · Foundation`}</Badge>
+              <Badge>{allComplete ? 'Daily reward unlocked' : `Level ${level} \u00b7 Foundation`}</Badge>
               <Text style={[styles.heroTitle, { color: colors.sidebarForeground }]}>
                 {allComplete ? 'You kept all four promises.' : 'Become better in every direction.'}
               </Text>
@@ -59,7 +60,7 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Today’s quests</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Today\u2019s quests</Text>
           <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>ONE STEP EACH</Text>
         </View>
         <Card style={{ backgroundColor: colors.card }}>

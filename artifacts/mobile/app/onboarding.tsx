@@ -1,10 +1,11 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge } from '@/components/native/badge';
 import { Button } from '@/components/native/button';
+import { Card, CardContent } from '@/components/native/card';
 import { nativeTheme } from '@/lib/native-theme';
 import { useColors } from '@/hooks/use-colors';
 import {
@@ -100,38 +101,55 @@ export default function OnboardingRoute() {
   const { setProfile } = useProgress();
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<Partial<OnboardingProfile>>({});
+  const [direction, setDirection] = useState(1);
   const step = STEPS[stepIndex];
   const selected = answers[step.key] as string | undefined;
+  const isFirst = stepIndex === 0;
   const isLast = stepIndex === STEPS.length - 1;
   const progress = (stepIndex + 1) / STEPS.length;
 
   const selectedCopy = useMemo(() => step.options.find((option) => option.value === selected), [selected, step.options]);
 
-  const continueOn = () => {
+  const animateStepChange = (newDirection: number) => {
+    setDirection(newDirection);
+    const nextIndex = stepIndex + newDirection;
+    setStepIndex(nextIndex);
+  };
+
+  const handleNext = () => {
     if (!selected) return;
     if (!isLast) {
-      setStepIndex((current) => current + 1);
+      animateStepChange(1);
       return;
     }
     setProfile(answers as OnboardingProfile);
     router.replace('/(tabs)');
   };
 
+  const handleBack = () => {
+    if (!isFirst) {
+      animateStepChange(-1);
+    }
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
       <View style={styles.topBar}>
-        <View style={styles.brandMark}>
-          <Feather name="compass" size={16} color={colors.primaryForeground} />
-        </View>
-        <Text style={[styles.brand, { color: colors.foreground }]}>JACK OF ALL</Text>
+        <Badge tone="primary" size="sm" style={styles.brandMark}>
+          <Feather name="compass" size={14} color={colors.primaryForeground} />
+        </Badge>
+        <Text style={[styles.brand, { color: colors.foreground }]}>GROWTH PATH</Text>
         <Text style={[styles.stepCount, { color: colors.mutedForeground }]}>{stepIndex + 1} / {STEPS.length}</Text>
       </View>
+
       <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
         <View style={[styles.progressFill, { backgroundColor: colors.primary, width: `${progress * 100}%` }]} />
       </View>
 
       <View style={styles.content}>
-        <Badge>BUILD YOUR PATH</Badge>
+        <Badge tone="primary" size="sm" style={styles.stepBadge}>
+          BUILD YOUR PATH
+        </Badge>
         <Text style={[styles.eyebrow, { color: colors.primary }]}>{step.eyebrow}</Text>
         <Text style={[styles.title, { color: colors.foreground }]}>{step.title}</Text>
         <Text style={[styles.detail, { color: colors.mutedForeground }]}>{step.detail}</Text>
@@ -142,23 +160,31 @@ export default function OnboardingRoute() {
             return (
               <Pressable
                 key={option.value}
-                testID={`onboarding-${step.key}-${option.value}`}
                 onPress={() => setAnswers((current) => ({ ...current, [step.key]: option.value }))}
                 style={({ pressed }) => [
-                  styles.option,
-                  { backgroundColor: active ? colors.sidebar : colors.card, borderColor: active ? colors.primary : colors.border, opacity: pressed ? 0.78 : 1 },
+                  styles.optionCard,
+                  { backgroundColor: active ? colors.sidebar : colors.card, borderColor: active ? colors.primary : colors.border, opacity: pressed ? 0.8 : 1 },
                 ]}
               >
-                <View style={[styles.optionIcon, { backgroundColor: active ? colors.primary : colors.muted }]}>
-                  <Feather name={option.icon} size={18} color={active ? colors.primaryForeground : colors.foreground} />
-                </View>
-                <View style={styles.optionCopy}>
-                  <Text style={[styles.optionLabel, { color: active ? colors.sidebarForeground : colors.foreground }]}>{option.label}</Text>
-                  <Text style={[styles.optionDetail, { color: active ? colors.sidebarForeground : colors.mutedForeground }]}>{option.detail}</Text>
-                </View>
-                <View style={[styles.radio, { borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary : 'transparent' }]}>
-                  {active ? <Feather name="check" size={13} color={colors.primaryForeground} /> : null}
-                </View>
+                <Card style={{ backgroundColor: 'transparent', borderWidth: 0 }}>
+                  <View style={styles.optionRow}>
+                    <View style={[styles.optionIcon, { backgroundColor: active ? colors.primary : colors.muted }]}>
+                      <Feather name={option.icon} size={18} color={active ? colors.primaryForeground : colors.foreground} />
+                    </View>
+                    <View style={styles.optionCopy}>
+                      <Text style={[styles.optionLabel, { color: active ? colors.sidebarForeground : colors.foreground }]}>{option.label}</Text>
+                      <Text style={[styles.optionDetail, { color: active ? colors.sidebarForeground : colors.mutedForeground }]}>{option.detail}</Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.radio,
+                        { borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary : 'transparent' },
+                      ]}
+                    >
+                      {active && <Feather name="check" size={13} color={colors.primaryForeground} />}
+                    </View>
+                  </View>
+                </Card>
               </Pressable>
             );
           })}
@@ -167,9 +193,39 @@ export default function OnboardingRoute() {
 
       <View style={styles.footer}>
         <Text style={[styles.selectedText, { color: colors.mutedForeground }]}>{selectedCopy ? `Selected: ${selectedCopy.label}` : 'Choose what feels true today'}</Text>
-        <Button testID="onboarding-continue" disabled={!selected} onPress={continueOn} size="lg">
+        <Button
+          testID="onboarding-continue"
+          disabled={!selected}
+          onPress={() => {
+            if (!selected) return;
+            if (!isLast) {
+              animateStepChange(1);
+              return;
+            }
+            setProfile(answers as OnboardingProfile);
+            router.replace('/(tabs)');
+          }}
+          size="lg"
+          fullWidth
+          variant={isLast ? 'xp' : 'primary'}
+        >
           {isLast ? 'Begin my path' : 'Continue'}
         </Button>
+        {!isFirst && (
+          <Button
+            variant="ghost"
+            size="md"
+            fullWidth
+            onPress={() => {
+              if (!isFirst) {
+                animateStepChange(-1);
+              }
+            }}
+            style={styles.backButton}
+          >
+            Back
+          </Button>
+        )}
       </View>
     </View>
   );
@@ -178,22 +234,25 @@ export default function OnboardingRoute() {
 const styles = StyleSheet.create({
   screen: { flex: 1, paddingHorizontal: nativeTheme.spacing.lg },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: nativeTheme.spacing.sm },
-  brandMark: { width: 30, height: 30, borderRadius: nativeTheme.radius.md, backgroundColor: '#D97745', alignItems: 'center', justifyContent: 'center' },
-  brand: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 11, letterSpacing: 1.4, flex: 1 },
+  brandMark: { width: 32, height: 32, borderRadius: nativeTheme.radius.md, alignItems: 'center', justifyContent: 'center' },
+  brand: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 11, letterSpacing: 1.8, flex: 1 },
   stepCount: { fontFamily: nativeTheme.typography.sans.medium, fontSize: 12 },
   progressTrack: { height: 5, borderRadius: 5, overflow: 'hidden', marginTop: nativeTheme.spacing.md },
   progressFill: { height: '100%', borderRadius: 5 },
   content: { flex: 1, paddingTop: nativeTheme.spacing.xxl },
-  eyebrow: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 11, letterSpacing: 1.7, marginTop: nativeTheme.spacing.xl },
-  title: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 29, lineHeight: 35, marginTop: nativeTheme.spacing.sm },
-  detail: { fontFamily: nativeTheme.typography.sans.regular, fontSize: 14, lineHeight: 21, marginTop: nativeTheme.spacing.md },
+  stepBadge: { marginBottom: nativeTheme.spacing.md },
+  eyebrow: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 11, letterSpacing: 1.8, marginTop: nativeTheme.spacing.xl },
+  title: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 28, lineHeight: 34, marginTop: nativeTheme.spacing.sm },
+  detail: { fontFamily: nativeTheme.typography.sans.regular, fontSize: 14, lineHeight: 22, marginTop: nativeTheme.spacing.md },
   options: { gap: nativeTheme.spacing.sm, marginTop: nativeTheme.spacing.xl },
-  option: { minHeight: 68, borderWidth: 1, borderRadius: nativeTheme.radius.lg, padding: nativeTheme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: nativeTheme.spacing.md },
+  optionCard: { borderWidth: 1, borderRadius: nativeTheme.radius.lg, padding: 0, overflow: 'hidden' },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: nativeTheme.spacing.md, padding: nativeTheme.spacing.md },
   optionIcon: { width: 36, height: 36, borderRadius: nativeTheme.radius.md, alignItems: 'center', justifyContent: 'center' },
   optionCopy: { flex: 1, gap: 3 },
   optionLabel: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 14 },
   optionDetail: { fontFamily: nativeTheme.typography.sans.regular, fontSize: 11, lineHeight: 16 },
   radio: { width: 22, height: 22, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  footer: { gap: nativeTheme.spacing.sm },
+  footer: { gap: nativeTheme.spacing.sm, paddingBottom: nativeTheme.spacing.md },
   selectedText: { fontFamily: nativeTheme.typography.sans.medium, fontSize: 12, textAlign: 'center' },
+  backButton: { marginTop: nativeTheme.spacing.xs },
 });

@@ -65,6 +65,7 @@ export const nativeTheme = {
       medium: 'Inter_500Medium',
       semibold: 'Inter_600SemiBold',
       bold: 'Inter_700Bold',
+      extrabold: 'Inter_800ExtraBold',
     },
     serif: 'Georgia',
     mono: 'Menlo',

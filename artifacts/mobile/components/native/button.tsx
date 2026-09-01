@@ -11,7 +11,7 @@ import {
 import { nativeTheme } from '../../lib/native-theme';
 import { useColors } from '../../hooks/use-colors';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'xp' | 'streak';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 export type ButtonProps = Omit<PressableProps, 'style'> & {
@@ -19,7 +19,12 @@ export type ButtonProps = Omit<PressableProps, 'style'> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
+  disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
+  fullWidth?: boolean;
+  onPress?: () => void;
 };
 
 export function Button({
@@ -29,22 +34,35 @@ export function Button({
   loading = false,
   disabled,
   style,
-  ...props
+  leftIcon,
+  rightIcon,
+  fullWidth = false,
+  onPress,
 }: ButtonProps) {
   const colors = useColors();
   const isDisabled = disabled || loading;
+
   const backgroundColor = {
     primary: colors.primary,
     secondary: colors.secondary,
+    accent: colors.accent,
     outline: 'transparent',
     ghost: 'transparent',
+    xp: colors.xp || colors.accent,
+    streak: colors.streak || colors.primary,
   }[variant];
+
   const foregroundColor = {
     primary: colors.primaryForeground,
     secondary: colors.secondaryForeground,
+    accent: colors.accentForeground,
     outline: colors.foreground,
     ghost: colors.primary,
+    xp: colors.accentForeground,
+    streak: colors.accentForeground,
   }[variant];
+
+  const borderColor = variant === 'outline' ? colors.border : backgroundColor;
 
   return (
     <Pressable
@@ -55,13 +73,13 @@ export function Button({
         styles.base,
         styles[size],
         {
-          backgroundColor,
+          backgroundColor: isDisabled ? colors.muted : pressed ? backgroundColor : 'transparent',
           borderColor: variant === 'outline' ? colors.border : backgroundColor,
-          opacity: isDisabled ? 0.5 : pressed ? 0.8 : 1,
+          opacity: isDisabled ? 0.5 : 1,
         },
         style,
       ]}
-      {...props}
+      onPress={onPress}
     >
       {loading ? (
         <ActivityIndicator color={foregroundColor} />
