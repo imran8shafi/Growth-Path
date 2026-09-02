@@ -24,11 +24,11 @@ type Stage = 'intro' | 'questions' | 'analysis' | 'result' | 'commit' | 'ready';
 type AnswerKey = keyof OnboardingProfile;
 type IconName = keyof typeof Feather.glyphMap;
 type Option = { value: string; label: string; detail: string; icon: IconName };
-type Question = { key: AnswerKey; pillar: string; title: string; subtitle: string; options: Option[] };
+type Question = { key: AnswerKey; pillar: string; title: string; subtitle: string; options: Option[]; mode?: 'single' | 'ranked' };
 
 // Concrete, non-judgmental prompts informed by identity habits, attention training,
 // recovery, implementation intentions, and values reflection.
-const QUESTIONS: Question[] = [
+const BASE_QUESTIONS: Question[] = [
   {
     key: 'goal', pillar: 'YOUR WHY',
     title: 'What would make this journey feel worth it?',
@@ -41,9 +41,9 @@ const QUESTIONS: Question[] = [
     ],
   },
   {
-    key: 'focusTrack', pillar: 'STARTING POINT',
-    title: 'What feels most out of balance right now?',
-    subtitle: 'Your path will include all four. We just need a place to begin.',
+    key: 'priorityTracks', pillar: 'YOUR PRIORITIES', mode: 'ranked',
+    title: 'Which two paths need you most?',
+    subtitle: 'Choose your first priority, then your second. All four paths remain part of your plan.',
     options: [
       { value: 'mind', label: 'Mind', detail: 'Focus, learning, and clear thinking.', icon: 'book-open' },
       { value: 'body', label: 'Body', detail: 'Energy, strength, and recovery.', icon: 'activity' },
@@ -103,13 +103,45 @@ const QUESTIONS: Question[] = [
   },
   {
     key: 'beliefs', pillar: 'SOUL',
-    title: 'What helps you feel grounded?',
-    subtitle: 'Your inner path should feel sincere, not forced.',
+    title: 'How should the Soul path speak to you?',
+    subtitle: 'Your inner path should respect your actual beliefs.',
     options: [
       { value: 'faith', label: 'Faith or prayer', detail: 'A tradition or devotion guides me.', icon: 'sunrise' },
       { value: 'reflection', label: 'Quiet reflection', detail: 'Stillness helps me return to myself.', icon: 'moon' },
       { value: 'service', label: 'People and service', detail: 'I find meaning in showing up for others.', icon: 'users' },
       { value: 'open', label: 'I am still exploring', detail: 'Keep it open, practical, and honest.', icon: 'compass' },
+    ],
+  },
+  {
+    key: 'freedomFocus', pillar: 'FREEDOM',
+    title: 'What kind of freedom matters most now?',
+    subtitle: 'This determines whether your quests build financial room, mobility, or both.',
+    options: [
+      { value: 'financial', label: 'Financial freedom', detail: 'Earn more, save better, and reduce dependence.', icon: 'dollar-sign' },
+      { value: 'mobility', label: 'Time and travel freedom', detail: 'Create work and systems that can move with me.', icon: 'map' },
+      { value: 'both', label: 'Both', detail: 'Build money and mobility together.', icon: 'navigation' },
+    ],
+  },
+  {
+    key: 'freedomStage', pillar: 'YOUR STARTING POINT',
+    title: 'Where should your Freedom path begin?',
+    subtitle: 'Choose the problem that is most real today—not the final destination.',
+    options: [
+      { value: 'control', label: 'Control my spending', detail: 'Understand where my money goes.', icon: 'pie-chart' },
+      { value: 'saving', label: 'Build savings', detail: 'Create security and a freedom runway.', icon: 'shield' },
+      { value: 'income', label: 'Increase my income', detail: 'Develop and prove a valuable skill.', icon: 'trending-up' },
+      { value: 'business', label: 'Build my business', detail: 'Create assets, systems, and customers.', icon: 'briefcase' },
+    ],
+  },
+  {
+    key: 'readingStyle', pillar: 'HOW YOU LEARN',
+    title: 'How do you want books to guide you?',
+    subtitle: 'We will turn relevant books into actions, not a forgotten reading list.',
+    options: [
+      { value: 'practical', label: 'Fast and practical', detail: 'Clear concepts and an immediate action.', icon: 'zap' },
+      { value: 'deep', label: 'Let me go deep', detail: 'Longer reading and more demanding reflection.', icon: 'book' },
+      { value: 'mixed', label: 'Mix both', detail: 'Practical tools alongside deeper philosophy.', icon: 'shuffle' },
+      { value: 'exercises', label: 'I prefer exercises', detail: 'Keep reading light and lead with practice.', icon: 'edit-3' },
     ],
   },
   {
@@ -132,7 +164,39 @@ const QUESTIONS: Question[] = [
       { value: 'gym', label: 'At a gym', detail: 'A full setup is available.', icon: 'bar-chart' },
     ],
   },
+  {
+    key: 'movementLimit', pillar: 'MOVE SAFELY',
+    title: 'Is there anything your exercises should avoid?',
+    subtitle: 'We will keep suggestions conservative. This does not replace professional medical guidance.',
+    options: [
+      { value: 'none', label: 'Nothing I know of', detail: 'Use the plan that matches my current ability.', icon: 'check-circle' },
+      { value: 'knees', label: 'Knee limitations', detail: 'Avoid assuming deep bending or impact is appropriate.', icon: 'alert-circle' },
+      { value: 'back', label: 'Back limitations', detail: 'Avoid assuming loaded bending is appropriate.', icon: 'alert-circle' },
+      { value: 'shoulders', label: 'Shoulder limitations', detail: 'Avoid assuming pressing overhead is appropriate.', icon: 'alert-circle' },
+      { value: 'other', label: 'Something else', detail: 'Use only movement already cleared for me.', icon: 'shield' },
+    ],
+  },
 ];
+
+const FAITH_QUESTION: Question = {
+  key: 'faithTradition', pillar: 'YOUR TRADITION',
+  title: 'Which tradition should we respect?',
+  subtitle: 'This is only used to keep readings and reflections relevant. You can keep it private.',
+  options: [
+    { value: 'islam', label: 'Islam', detail: 'Use Islamic language and relevant scripture journeys.', icon: 'moon' },
+    { value: 'christianity', label: 'Christianity', detail: 'Use Christian language and relevant scripture journeys.', icon: 'book-open' },
+    { value: 'hinduism', label: 'Hinduism', detail: 'Use Hindu language and relevant scripture journeys.', icon: 'sun' },
+    { value: 'buddhism', label: 'Buddhism', detail: 'Use Buddhist language and relevant scripture journeys.', icon: 'circle' },
+    { value: 'other', label: 'Another tradition', detail: 'Keep practices faith-aware without assuming details.', icon: 'compass' },
+    { value: 'private', label: 'Keep it private', detail: 'Use neutral faith language.', icon: 'lock' },
+  ],
+};
+
+function getQuestions(answers: Partial<OnboardingProfile>) {
+  if (answers.beliefs !== 'faith') return BASE_QUESTIONS;
+  const beliefIndex = BASE_QUESTIONS.findIndex((question) => question.key === 'beliefs');
+  return [...BASE_QUESTIONS.slice(0, beliefIndex + 1), FAITH_QUESTION, ...BASE_QUESTIONS.slice(beliefIndex + 1)];
+}
 
 function Background({ children }: { children: React.ReactNode }) {
   const drift = useSharedValue(0);
@@ -212,9 +276,9 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
   );
 }
 
-function ProgressHeader({ index, onBack }: { index: number; onBack: () => void }) {
-  const progress = useSharedValue((index + 1) / QUESTIONS.length);
-  useEffect(() => { progress.value = withTiming((index + 1) / QUESTIONS.length, { duration: 420 }); }, [index, progress]);
+function ProgressHeader({ index, total, onBack }: { index: number; total: number; onBack: () => void }) {
+  const progress = useSharedValue((index + 1) / total);
+  useEffect(() => { progress.value = withTiming((index + 1) / total, { duration: 420 }); }, [index, progress, total]);
   const fill = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.value }] }));
   return (
     <View style={styles.progressHeader}>
@@ -222,17 +286,17 @@ function ProgressHeader({ index, onBack }: { index: number; onBack: () => void }
         <Feather name="arrow-left" size={21} color={C.text} />
       </Pressable>
       <View style={styles.progressTrack}><Animated.View style={[styles.progressFill, fill]} /></View>
-      <Text style={styles.progressCount}>{index + 1}/{QUESTIONS.length}</Text>
+      <Text style={styles.progressCount}>{index + 1}/{total}</Text>
     </View>
   );
 }
 
-function OptionCard({ option, selected, index, onPress }: { option: Option; selected: boolean; index: number; onPress: () => void }) {
+function OptionCard({ option, selected, rank, ranked, index, onPress }: { option: Option; selected: boolean; rank?: number; ranked?: boolean; index: number; onPress: () => void }) {
   const scale = useSharedValue(1);
   const motion = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <Animated.View entering={FadeInDown.delay(90 + index * 65).duration(360)} style={motion}>
-      <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected }}
+      <Pressable accessibilityRole={ranked ? 'checkbox' : 'radio'} accessibilityState={{ checked: selected }}
         onPress={() => { void Haptics.selectionAsync(); onPress(); }}
         onPressIn={() => { scale.value = withSpring(0.985); }} onPressOut={() => { scale.value = withSpring(1); }}
         style={[styles.optionCard, selected && styles.optionCardSelected]}>
@@ -242,29 +306,37 @@ function OptionCard({ option, selected, index, onPress }: { option: Option; sele
         <View style={styles.optionCopy}>
           <Text style={styles.optionLabel}>{option.label}</Text><Text style={styles.optionDetail}>{option.detail}</Text>
         </View>
-        <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <Feather name="check" size={13} color={C.bg} /> : null}</View>
+        <View style={[styles.radio, selected && styles.radioSelected]}>
+          {rank ? <Text style={styles.rankNumber}>{rank}</Text> : selected ? <Feather name="check" size={13} color={C.bg} /> : null}
+        </View>
       </Pressable>
     </Animated.View>
   );
 }
 
-function QuestionScreen({ question, index, selected, direction, onSelect, onBack, onContinue }: {
-  question: Question; index: number; selected?: string; direction: number;
+function QuestionScreen({ question, index, total, selected, direction, onSelect, onBack, onContinue }: {
+  question: Question; index: number; total: number; selected?: string | string[]; direction: number;
   onSelect: (value: string) => void; onBack: () => void; onContinue: () => void;
 }) {
+  const ranked = question.mode === 'ranked';
+  const selectedValues = Array.isArray(selected) ? selected : selected ? [selected] : [];
+  const canContinue = ranked ? selectedValues.length === 2 : selectedValues.length === 1;
   return (
     <View style={styles.questionScreen}>
-      <ProgressHeader index={index} onBack={onBack} />
+      <ProgressHeader index={index} total={total} onBack={onBack} />
       <Animated.View key={question.key} entering={direction > 0 ? FadeInRight.duration(420) : FadeInLeft.duration(420)} style={styles.questionBody}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.questionScroll}>
           <Text style={styles.pillar}>{question.pillar}</Text><Text style={styles.questionTitle}>{question.title}</Text>
           <Text style={styles.questionSubtitle}>{question.subtitle}</Text>
-          <View accessibilityRole="radiogroup" style={styles.options}>
-            {question.options.map((option, optionIndex) => <OptionCard key={option.value} option={option} index={optionIndex} selected={selected === option.value} onPress={() => onSelect(option.value)} />)}
+          <View accessibilityRole={ranked ? undefined : 'radiogroup'} style={styles.options}>
+            {question.options.map((option, optionIndex) => {
+              const rankIndex = selectedValues.indexOf(option.value);
+              return <OptionCard key={option.value} option={option} index={optionIndex} selected={rankIndex >= 0} rank={ranked && rankIndex >= 0 ? rankIndex + 1 : undefined} ranked={ranked} onPress={() => onSelect(option.value)} />;
+            })}
           </View>
         </ScrollView>
         <View style={styles.questionFooter}>
-          <PrimaryButton label={index === QUESTIONS.length - 1 ? 'Create my path' : 'Continue'} onPress={onContinue} disabled={!selected} icon="arrow-right" />
+          <PrimaryButton label={index === total - 1 ? 'Create my path' : ranked && selectedValues.length < 2 ? 'Choose two paths' : 'Continue'} onPress={onContinue} disabled={!canContinue} icon="arrow-right" />
         </View>
       </Animated.View>
     </View>
@@ -321,7 +393,7 @@ function calculateScores(a: Partial<OnboardingProfile>): Scores {
     body: 28 + time + (a.energyLevel === 'strong' ? 18 : a.energyLevel === 'uneven' ? 9 : 3) + (a.sleepQuality === 'good' ? 10 : a.sleepQuality === 'okay' ? 5 : 0),
     soul: 37 + consistency + (a.beliefs === 'open' ? 4 : 13), freedom: 34 + time + (a.goal === 'autonomy' ? 18 : 8),
   };
-  const score = (track: TrackKey) => Math.min(82, raw[track] + (a.focusTrack === track ? 4 : 0));
+  const score = (track: TrackKey) => Math.min(82, raw[track] + (a.priorityTracks?.[0] === track ? 4 : a.priorityTracks?.[1] === track ? 2 : 0));
   const make = (track: TrackKey) => { const now = score(track); return { now, potential: Math.min(94, now + 27) }; };
   return { mind: make('mind'), body: make('body'), soul: make('soul'), freedom: make('freedom') };
 }
@@ -399,14 +471,42 @@ function ReadyScreen({ onDone }: { onDone: () => void }) {
 export default function OnboardingRoute() {
   const insets = useSafeAreaInsets(); const { setProfile } = useProgress();
   const [stage, setStage] = useState<Stage>('intro'); const [questionIndex, setQuestionIndex] = useState(0); const [direction, setDirection] = useState(1);
-  const [answers, setAnswers] = useState<Partial<OnboardingProfile>>({}); const question = QUESTIONS[questionIndex]; const selected = answers[question?.key] as string | undefined;
-  const next = () => { if (!selected) return; if (questionIndex === QUESTIONS.length - 1) { setStage('analysis'); return; } setDirection(1); setQuestionIndex((i) => i + 1); };
+  const [answers, setAnswers] = useState<Partial<OnboardingProfile>>({});
+  const questions = useMemo(() => getQuestions(answers), [answers.beliefs]);
+  const question = questions[questionIndex];
+  const selected = question?.key === 'priorityTracks' ? answers.priorityTracks : answers[question?.key] as string | undefined;
+  const canContinue = question?.mode === 'ranked' ? Array.isArray(selected) && selected.length === 2 : Boolean(selected);
+  const next = () => { if (!canContinue) return; if (questionIndex === questions.length - 1) { setStage('analysis'); return; } setDirection(1); setQuestionIndex((i) => i + 1); };
   const back = () => { if (questionIndex === 0) { setStage('intro'); return; } setDirection(-1); setQuestionIndex((i) => i - 1); };
-  const finish = () => { setProfile(answers as OnboardingProfile); setStage('ready'); };
+  const selectAnswer = (value: string) => {
+    if (question.key === 'priorityTracks') {
+      setAnswers((current) => {
+        const track = value as TrackKey;
+        const selectedTracks = current.priorityTracks ? [...current.priorityTracks] : [];
+        const existingIndex = selectedTracks.indexOf(track);
+        if (existingIndex >= 0) selectedTracks.splice(existingIndex, 1);
+        else if (selectedTracks.length < 2) selectedTracks.push(track);
+        else selectedTracks[1] = track;
+        const priorityTracks = selectedTracks as [TrackKey, TrackKey];
+        return { ...current, priorityTracks, focusTrack: priorityTracks[0] ?? current.focusTrack };
+      });
+      return;
+    }
+    setAnswers((current) => {
+      const nextAnswers = { ...current, [question.key]: value };
+      if (question.key === 'beliefs' && value !== 'faith') delete nextAnswers.faithTradition;
+      return nextAnswers;
+    });
+  };
+  const finish = () => {
+    const priorityTracks = answers.priorityTracks ?? ['mind', 'body'];
+    setProfile({ ...answers, priorityTracks, focusTrack: priorityTracks[0] } as OnboardingProfile);
+    setStage('ready');
+  };
   return (
     <Background><View style={[styles.safeFrame, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 12 }]}>
       {stage === 'intro' ? <IntroScreen onStart={() => setStage('questions')} /> : null}
-      {stage === 'questions' ? <QuestionScreen question={question} index={questionIndex} selected={selected} direction={direction} onSelect={(value) => setAnswers((a) => ({ ...a, [question.key]: value }))} onBack={back} onContinue={next} /> : null}
+      {stage === 'questions' ? <QuestionScreen question={question} index={questionIndex} total={questions.length} selected={selected} direction={direction} onSelect={selectAnswer} onBack={back} onContinue={next} /> : null}
       {stage === 'analysis' ? <AnalysisScreen onDone={() => setStage('result')} /> : null}
       {stage === 'result' ? <ResultScreen answers={answers} onContinue={() => setStage('commit')} /> : null}
       {stage === 'commit' ? <CommitmentScreen answers={answers} onUnlock={finish} /> : null}
@@ -436,7 +536,7 @@ const styles = StyleSheet.create({
   optionCard: { minHeight: 70, borderRadius: 15, padding: 13, backgroundColor: 'rgba(17,40,59,0.82)', borderWidth: 1, borderColor: C.border, flexDirection: 'row', alignItems: 'center', gap: 12 },
   optionCardSelected: { backgroundColor: '#123445', borderColor: C.cyan, shadowColor: C.cyan, shadowOpacity: 0.16, shadowRadius: 12 }, optionIcon: { width: 39, height: 39, borderRadius: 12, backgroundColor: '#142D40', alignItems: 'center', justifyContent: 'center' },
   optionIconSelected: { backgroundColor: C.cyan }, optionCopy: { flex: 1, gap: 3 }, optionLabel: { color: C.text, fontFamily: nativeTheme.typography.sans.semibold, fontSize: 14 }, optionDetail: { color: C.muted, fontFamily: nativeTheme.typography.sans.regular, fontSize: 11.5, lineHeight: 16 },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#486276', alignItems: 'center', justifyContent: 'center' }, radioSelected: { backgroundColor: C.cyan, borderColor: C.cyan },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#486276', alignItems: 'center', justifyContent: 'center' }, radioSelected: { backgroundColor: C.cyan, borderColor: C.cyan }, rankNumber: { color: C.bg, fontFamily: nativeTheme.typography.sans.bold, fontSize: 11 },
   questionFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 15, backgroundColor: 'rgba(5,10,18,0.94)' },
   analysisScreen: { flex: 1, justifyContent: 'center' }, analysisKicker: { color: C.green, textAlign: 'center', fontFamily: nativeTheme.typography.sans.bold, fontSize: 11, letterSpacing: 2.4 },
   analysisPercent: { color: C.text, textAlign: 'center', fontFamily: nativeTheme.typography.sans.extrabold, fontSize: 58, letterSpacing: -2, marginTop: 18 }, analysisTitle: { color: C.text, textAlign: 'center', fontFamily: nativeTheme.typography.sans.semibold, fontSize: 19, marginTop: 4 },
