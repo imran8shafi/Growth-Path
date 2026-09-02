@@ -8,6 +8,10 @@ export type TimeCommitment = 'ten' | 'twenty' | 'forty';
 export type BeliefStyle = 'faith' | 'reflection' | 'service' | 'open';
 export type Equipment = 'none' | 'home' | 'gym';
 export type Ability = 'starting' | 'building' | 'advanced';
+export type Consistency = 'fresh' | 'inconsistent' | 'steady';
+export type MindState = 'scattered' | 'stressed' | 'clear';
+export type EnergyLevel = 'low' | 'uneven' | 'strong';
+export type SleepQuality = 'poor' | 'okay' | 'good';
 
 export type OnboardingProfile = {
   goal: Goal;
@@ -16,6 +20,10 @@ export type OnboardingProfile = {
   equipment: Equipment;
   ability: Ability;
   focusTrack: TrackKey;
+  consistency?: Consistency;
+  mindState?: MindState;
+  energyLevel?: EnergyLevel;
+  sleepQuality?: SleepQuality;
 };
 
 export type Quest = {
@@ -87,6 +95,10 @@ const DEFAULT_PROFILE: OnboardingProfile = {
   equipment: 'none',
   ability: 'starting',
   focusTrack: 'mind',
+  consistency: 'fresh',
+  mindState: 'scattered',
+  energyLevel: 'uneven',
+  sleepQuality: 'okay',
 };
 
 function todayKey() {
@@ -112,6 +124,7 @@ export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null
   const current = profile ?? DEFAULT_PROFILE;
   const timeLabel = current.time === 'ten' ? '10 MIN' : current.time === 'forty' ? '40 MIN' : '20 MIN';
   const effortLabel = current.ability === 'starting' ? 'STARTER' : current.ability === 'advanced' ? 'DEEPEN' : 'BUILD';
+  const consistencyLabel = current.consistency === 'steady' ? effortLabel : current.consistency === 'inconsistent' ? 'KEEP IT ALIVE' : 'FIRST STEP';
 
   // Track colors for UI
   const trackColors: Record<TrackKey, string> = {
@@ -133,9 +146,9 @@ const tasks: Record<TrackKey, Quest[]> = {
       {
         id: 'mind-read',
         track,
-        title: current.time === 'ten' ? 'Read for 10 minutes' : 'Read for 20 minutes',
-        detail: 'Train the attention that makes meaningful work possible.',
-        meta: timeLabel,
+        title: current.mindState === 'scattered' ? 'Close one mental loop' : current.mindState === 'stressed' ? 'Take ten quiet minutes' : current.time === 'ten' ? 'Read for 10 minutes' : 'Read for 20 minutes',
+        detail: current.mindState === 'scattered' ? 'Write down the noise, then finish one small thing.' : current.mindState === 'stressed' ? 'Breathe slowly and let one thought settle.' : 'Train the attention that makes meaningful work possible.',
+        meta: current.mindState === 'clear' ? timeLabel : consistencyLabel,
         xp: current.ability === 'advanced' ? 45 : 35,
         trackColor: trackColors.mind,
         trackIcon: trackIcons.mind,
@@ -147,15 +160,15 @@ const tasks: Record<TrackKey, Quest[]> = {
       {
         id: 'body-move',
         track,
-        title: current.equipment === 'gym' ? 'Complete today\'s training' : 'Move with intention',
-        detail: current.equipment === 'none' ? 'Walk, stretch, or train with your bodyweight.' : 'Push, pull, squat, hinge, carry, or walk.',
+        title: current.energyLevel === 'low' ? 'Take an energy walk' : current.equipment === 'gym' ? 'Complete today\'s training' : 'Move with intention',
+        detail: current.energyLevel === 'low' ? 'Use easy movement and daylight to wake your system up.' : current.equipment === 'none' ? 'Walk, stretch, or train with your bodyweight.' : 'Push, pull, squat, hinge, carry, or walk.',
         meta: current.time === 'ten' ? '10 MIN' : '30 MIN',
         xp: current.ability === 'advanced' ? 50 : 40,
         trackColor: trackColors.body,
         trackIcon: trackIcons.body,
       },
       { id: 'body-recover', track, title: 'Get outside and breathe', detail: 'Light, air, and an unhurried pace.', meta: '10 MIN', xp: 30, trackColor: trackColors.body, trackIcon: trackIcons.body },
-      { id: 'body-sleep', track, title: 'Protect your sleep window', detail: 'Set tomorrow up before tonight ends.', meta: 'RITUAL', xp: 35, trackColor: trackColors.body, trackIcon: trackIcons.body },
+      { id: 'body-sleep', track, title: current.sleepQuality === 'poor' ? 'Build one wind-down cue' : 'Protect your sleep window', detail: current.sleepQuality === 'poor' ? 'Dim the lights and put the day down before bed.' : 'Set tomorrow up before tonight ends.', meta: 'RECOVERY', xp: 35, trackColor: trackColors.body, trackIcon: trackIcons.body },
     ],
     soul: [
       {
@@ -182,7 +195,7 @@ const tasks: Record<TrackKey, Quest[]> = {
         trackColor: trackColors.freedom,
         trackIcon: trackIcons.freedom,
       },
-      { id: 'freedom-build', track, title: 'Ship one small asset', detail: 'A useful offer, page, system, or conversation.', meta: '45 MIN', xp: 50, trackColor: trackColors.freedom, trackIcon: trackIcons.freedom },
+      { id: 'freedom-build', track, title: current.consistency === 'fresh' ? 'Finish one tiny asset' : 'Ship one small asset', detail: 'A useful offer, page, system, or conversation.', meta: current.consistency === 'fresh' ? 'FIRST STEP' : '45 MIN', xp: 50, trackColor: trackColors.freedom, trackIcon: trackIcons.freedom },
       { id: 'freedom-learn', track, title: 'Study a freedom skill', detail: 'Sales, writing, code, investing, or craft.', meta: effortLabel, xp: 45, trackColor: trackColors.freedom, trackIcon: trackIcons.freedom },
     ],
   };
