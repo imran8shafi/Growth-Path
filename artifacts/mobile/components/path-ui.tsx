@@ -1,18 +1,48 @@
 import { Feather } from '@expo/vector-icons';
+import { Asset } from 'expo-asset';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInLeft, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DailyRing } from '@/components/progress-visuals';
 import { nativeTheme } from '@/lib/native-theme';
-import type { Book, TrackKey } from '@/context/progress';
+import type { Book, TrackKey, TraitKey } from '@/context/progress';
 import { getBookReason, getRecommendedBooks, getTodayTasks, useProgress } from '@/context/progress';
 
 type IconName = keyof typeof Feather.glyphMap;
+
+const INCLUDED_GUIDES: Record<TrackKey, number> = {
+  mind: require('../assets/books/growth-path-mind-field-guide.pdf'),
+  body: require('../assets/books/growth-path-body-field-guide.pdf'),
+  soul: require('../assets/books/growth-path-soul-field-guide.pdf'),
+  freedom: require('../assets/books/growth-path-freedom-field-guide.pdf'),
+};
+
+async function openIncludedGuide(track: TrackKey) {
+  const asset = Asset.fromModule(INCLUDED_GUIDES[track]);
+
+  try {
+    await asset.downloadAsync();
+    const uri = asset.localUri ?? asset.uri;
+    if (Platform.OS === 'web') {
+      await WebBrowser.openBrowserAsync(asset.uri);
+      return;
+    }
+    await Linking.openURL(uri);
+  } catch {
+    try {
+      await WebBrowser.openBrowserAsync(asset.uri);
+    } catch {
+      Alert.alert('Could not open the guide', 'The PDF is included with Growth Path, but this device does not have an available PDF viewer.');
+    }
+  }
+}
+
 export type TrackConfig = {
   key: TrackKey; label: string; title: string; description: string; benefit: string;
   icon: IconName; color: string; glow: string;
@@ -53,9 +83,9 @@ export function ScreenHeader({ eyebrow, title, subtitle, icon, color = '#55D6FF'
   );
 }
 
-export function TaskRow({ id, track, title, detail, meta, xp, trackColor, onPress, isComplete: completeProp, index = 0 }: {
+export function TaskRow({ id, track, title, detail, meta, xp, trackColor, trait, onPress, isComplete: completeProp, index = 0 }: {
   id: string; track: TrackKey; title: string; detail: string; meta: string; xp: number; trackColor: string; trackIcon: string;
-  onPress?: () => void; isComplete?: boolean; index?: number;
+  trait?: TraitKey; onPress?: () => void; isComplete?: boolean; index?: number;
 }) {
   const { isComplete, toggle } = useProgress();
   const complete = completeProp ?? isComplete(id);
@@ -63,7 +93,7 @@ export function TaskRow({ id, track, title, detail, meta, xp, trackColor, onPres
   const motion = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const handlePress = () => {
     scale.value = withSequence(withSpring(0.975), withSpring(complete ? 1 : 1.018), withSpring(1));
-    (onPress ?? (() => toggle(id, track, xp)))();
+    (onPress ?? (() => toggle(id, track, xp, trait)))();
   };
   return (
     <Animated.View entering={FadeInDown.delay(index * 70).duration(430)} style={motion}>
@@ -79,23 +109,34 @@ export function TaskRow({ id, track, title, detail, meta, xp, trackColor, onPres
 
 function BookCard({ book, color, reason, expanded, index, onPress }: { book: Book; color: string; reason: string; expanded: boolean; index: number; onPress: () => void }) {
   const scale = useSharedValue(1);
+  const [opening, setOpening] = useState(false);
   const motion = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const handleOpen = async () => {
+    if (!book.includedPdf || opening) return;
+    setOpening(true);
+    try {
+      await openIncludedGuide(book.track);
+    } finally {
+      setOpening(false);
+    }
+  };
   return (
     <Animated.View entering={FadeInDown.delay(380 + index * 80).duration(480)} style={motion}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        onPress={onPress}
-        onPressIn={() => { scale.value = withSpring(0.985); }}
-        onPressOut={() => { scale.value = withSpring(1); }}
-        style={[styles.bookCard, expanded && { borderColor: `${color}70`, backgroundColor: `${color}0E` }]}
-      >
-        <View style={styles.bookTopRow}>
-          <View style={[styles.bookIcon, { backgroundColor: `${color}1C` }]}><Feather name="book-open" size={18} color={color} /></View>
+      <View style={[styles.bookCard, expanded && { borderColor: `${color}70`, backgroundColor: `${color}0E` }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={`${book.title} by ${book.author}`}
+          onPress={onPress}
+          onPressIn={() => { scale.value = withSpring(0.985); }}
+          onPressOut={() => { scale.value = withSpring(1); }}
+          style={styles.bookTopRow}
+        >
+          <View style={[styles.bookIcon, { backgroundColor: `${color}1C` }]}><Feather name={book.includedPdf ? 'file-text' : 'book-open'} size={18} color={color} /></View>
           <View style={styles.bookHeading}><Text style={styles.bookTitle}>{book.title}</Text><Text style={styles.bookAuthor}>{book.author}</Text></View>
-          <View style={[styles.journeyPill, { backgroundColor: `${color}18` }]}><Text style={[styles.journeyText, { color }]}>{book.tier === 'starter' ? 'START HERE' : 'GO DEEPER'}</Text></View>
+          <View style={[styles.journeyPill, { backgroundColor: `${color}18` }]}><Text style={[styles.journeyText, { color }]}>{book.includedPdf ? 'PDF INCLUDED' : book.tier === 'starter' ? 'START HERE' : 'GO DEEPER'}</Text></View>
           <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={17} color="#61788A" />
-        </View>
+        </Pressable>
         {expanded ? (
           <Animated.View entering={FadeIn.duration(320)} style={styles.bookExpanded}>
             <Text style={styles.bookPromise}>{book.promise}</Text>
@@ -104,9 +145,16 @@ function BookCard({ book, color, reason, expanded, index, onPress }: { book: Boo
               <Text style={[styles.bookPracticeLabel, { color }]}>DAY 1 OF {book.journeyDays}</Text>
               <Text style={styles.bookPracticeText}>{book.practice}</Text>
             </View>
+            {book.includedPdf ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={`Open ${book.title} PDF`} disabled={opening} onPress={() => { void handleOpen(); }} style={({ pressed }) => [styles.openGuideButton, { backgroundColor: color }, pressed && styles.openGuideButtonPressed, opening && styles.openGuideButtonDisabled]}>
+                <Feather name={opening ? 'loader' : 'file-text'} size={15} color="#050A12" />
+                <Text style={styles.openGuideText}>{opening ? 'Preparing guide…' : 'Open included PDF'}</Text>
+                {!opening ? <Feather name="external-link" size={14} color="#050A12" /> : null}
+              </Pressable>
+            ) : null}
           </Animated.View>
         ) : null}
-      </Pressable>
+      </View>
     </Animated.View>
   );
 }
@@ -174,5 +222,6 @@ const styles = StyleSheet.create({
   bookCard: { borderRadius: 17, borderWidth: 1, borderColor: '#203A4F', backgroundColor: 'rgba(13,28,42,0.9)', padding: 13 }, bookTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 }, bookIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   bookHeading: { flex: 1 }, bookTitle: { color: '#F6FBFF', fontFamily: nativeTheme.typography.sans.semibold, fontSize: 13 }, bookAuthor: { color: '#61788A', fontFamily: nativeTheme.typography.sans.regular, fontSize: 10.5, marginTop: 3 }, journeyPill: { height: 23, borderRadius: 12, paddingHorizontal: 7, justifyContent: 'center' }, journeyText: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 8, letterSpacing: 0.6 },
   bookExpanded: { marginTop: 13, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#203A4F' }, bookPromise: { color: '#91A7B8', fontFamily: nativeTheme.typography.sans.regular, fontSize: 11.5, lineHeight: 17 }, whyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 12, padding: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.025)' }, whyCopy: { flex: 1 }, bookReason: { color: '#C8D8E3', fontFamily: nativeTheme.typography.sans.regular, fontSize: 10.5, lineHeight: 15, marginTop: 4 }, bookPractice: { borderLeftWidth: 2, paddingLeft: 10, marginTop: 12 }, bookPracticeLabel: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 8.5, letterSpacing: 1.1 }, bookPracticeText: { color: '#F6FBFF', fontFamily: nativeTheme.typography.sans.medium, fontSize: 11.5, lineHeight: 17, marginTop: 4 },
+  openGuideButton: { minHeight: 45, borderRadius: 13, marginTop: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, openGuideButtonPressed: { opacity: 0.82, transform: [{ scale: 0.985 }] }, openGuideButtonDisabled: { opacity: 0.62 }, openGuideText: { color: '#050A12', fontFamily: nativeTheme.typography.sans.bold, fontSize: 12.5, flexShrink: 1 },
   returnButton: { minHeight: 52, borderRadius: 16, backgroundColor: '#F6FBFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 24 }, returnText: { color: '#050A12', fontFamily: nativeTheme.typography.sans.bold, fontSize: 14 },
 });

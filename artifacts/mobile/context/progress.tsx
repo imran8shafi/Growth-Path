@@ -18,6 +18,13 @@ export type BookTier = 'starter' | 'deeper';
 export type FaithTradition = 'islam' | 'christianity' | 'hinduism' | 'buddhism' | 'other' | 'private';
 export type MovementLimit = 'none' | 'knees' | 'back' | 'shoulders' | 'other';
 export type FreedomStage = 'control' | 'saving' | 'income' | 'business';
+export type Archetype = 'guardian' | 'scholar' | 'builder' | 'pilgrim' | 'sovereign';
+export type MomentumObstacle = 'distraction' | 'energy' | 'clarity' | 'belief' | 'overwhelm' | 'alone' | 'narrow';
+export type CoachingStyle = 'demanding' | 'encouraging' | 'adaptive' | 'direct';
+export type FastingPreference = 'off' | 'curious' | 'experienced';
+export type FastingSafety = 'clear' | 'blocked' | 'clinician';
+export type TraitKey = 'wit' | 'adaptability' | 'courage' | 'social' | 'creativity' | 'practical';
+export type QuestKind = 'path' | 'anchor' | 'cross-training' | 'recovery';
 
 export type OnboardingProfile = {
   goal: Goal;
@@ -36,6 +43,11 @@ export type OnboardingProfile = {
   faithTradition?: FaithTradition;
   movementLimit: MovementLimit;
   freedomStage: FreedomStage;
+  archetype: Archetype;
+  momentumObstacle: MomentumObstacle;
+  coachingStyle: CoachingStyle;
+  fastingPreference: FastingPreference;
+  fastingSafety: FastingSafety;
 };
 
 export type Quest = {
@@ -47,6 +59,15 @@ export type Quest = {
   xp: number;
   trackColor: string;
   trackIcon: string;
+  trait?: TraitKey;
+  kind?: QuestKind;
+};
+
+export type FastingSession = {
+  startedAt: string;
+  endedAt: string;
+  minutes: number;
+  targetHours: number;
 };
 
 export type Book = {
@@ -62,6 +83,7 @@ export type Book = {
   beliefStyles?: BeliefStyle[];
   faithTraditions?: FaithTradition[];
   freedomFocuses?: FreedomFocus[];
+  includedPdf?: true;
 };
 
 type StoredState = {
@@ -74,6 +96,10 @@ type StoredState = {
   lastLevelUp?: number | null;
   dailyXp?: Record<string, number>;
   hapticsEnabled?: boolean;
+  xpByTrait?: Partial<Record<TraitKey, number>>;
+  cycleStartedAt?: string;
+  fastingStartedAt?: string | null;
+  fastingSessions?: FastingSession[];
   // Legacy field from the original local-first tracker.
   completed?: string[];
 };
@@ -88,6 +114,10 @@ type ProgressState = {
   lastLevelUp: number | null;
   dailyXp: Record<string, number>;
   hapticsEnabled: boolean;
+  xpByTrait: Record<TraitKey, number>;
+  cycleStartedAt: string;
+  fastingStartedAt: string | null;
+  fastingSessions: FastingSession[];
 };
 
 export type WeeklyXpPoint = {
@@ -101,7 +131,7 @@ type ProgressContextValue = {
   profile: OnboardingProfile | null;
   hydrated: boolean;
   isComplete: (id: string) => boolean;
-  toggle: (id: string, track: TrackKey, xp: number) => void;
+  toggle: (id: string, track: TrackKey, xp: number, trait?: TraitKey) => void;
   setProfile: (profile: OnboardingProfile) => void;
   resetOnboarding: () => void;
   totalCompleted: number;
@@ -117,6 +147,13 @@ type ProgressContextValue = {
   weeklyXp: WeeklyXpPoint[];
   hapticsEnabled: boolean;
   setHapticsEnabled: (enabled: boolean) => void;
+  traitXp: (trait: TraitKey) => number;
+  cycleStartedAt: string;
+  fastingStartedAt: string | null;
+  fastingSessions: FastingSession[];
+  startFast: () => void;
+  finishFast: () => void;
+  cancelFast: () => void;
 };
 
 const STORAGE_KEY = '@jack-of-all/progression';
@@ -144,6 +181,11 @@ const DEFAULT_PROFILE: OnboardingProfile = {
   readingStyle: 'mixed',
   movementLimit: 'none',
   freedomStage: 'control',
+  archetype: 'sovereign',
+  momentumObstacle: 'distraction',
+  coachingStyle: 'adaptive',
+  fastingPreference: 'off',
+  fastingSafety: 'blocked',
 };
 
 function localDateKey(date = new Date()) {
@@ -159,6 +201,10 @@ function todayKey() {
 
 function emptyXp(): Record<TrackKey, number> {
   return { mind: 0, body: 0, soul: 0, freedom: 0 };
+}
+
+function emptyTraitXp(): Record<TraitKey, number> {
+  return { wit: 0, adaptability: 0, courage: 0, social: 0, creativity: 0, practical: 0 };
 }
 
 function getWeeklyXp(dailyXp: Record<string, number>): WeeklyXpPoint[] {
@@ -228,6 +274,52 @@ function deterministicShuffle<T>(items: T[], seedText: string) {
     [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
   return shuffled;
+}
+
+export const ARCHETYPE_META: Record<Archetype, { label: string; evolved: string; description: string; icon: string; color: string }> = {
+  guardian: { label: 'Guardian', evolved: 'Steadfast Guardian', description: 'Capability, courage, and responsibility.', icon: 'shield', color: '#4CD6B0' },
+  scholar: { label: 'Scholar', evolved: 'Focused Scholar', description: 'Attention, understanding, and clear judgment.', icon: 'book-open', color: '#55D6FF' },
+  builder: { label: 'Builder', evolved: 'Sovereign Builder', description: 'Useful skills, systems, and independence.', icon: 'tool', color: '#8D7CFF' },
+  pilgrim: { label: 'Pilgrim', evolved: 'Grounded Pilgrim', description: 'Belief, meaning, and honest exploration.', icon: 'compass', color: '#FFCC66' },
+  sovereign: { label: 'Sovereign', evolved: 'Integrated Sovereign', description: 'Balanced command of the whole life.', icon: 'hexagon', color: '#6DE3FF' },
+};
+
+export const TRAIT_META: Record<TraitKey, { label: string; description: string; color: string; icon: string }> = {
+  wit: { label: 'Wit', description: 'Notice surprise and communicate with lightness.', color: '#F59ED7', icon: 'smile' },
+  adaptability: { label: 'Adaptability', description: 'Change strategy without abandoning the aim.', color: '#55D6FF', icon: 'shuffle' },
+  courage: { label: 'Courage', description: 'Move toward useful discomfort with judgment.', color: '#FF8A65', icon: 'shield' },
+  social: { label: 'Social intelligence', description: 'Listen, read the room, and strengthen trust.', color: '#FFCC66', icon: 'users' },
+  creativity: { label: 'Creativity', description: 'Generate options and connect distant ideas.', color: '#8D7CFF', icon: 'aperture' },
+  practical: { label: 'Practical ability', description: 'Solve real problems with tools and systems.', color: '#4CD6B0', icon: 'tool' },
+};
+
+export const CYCLE_CHAPTERS = [
+  { title: 'Foundation', detail: 'Make returning easier than quitting.' },
+  { title: 'Attention', detail: 'Choose what is allowed to shape you.' },
+  { title: 'Capability', detail: 'Build energy, strength, and useful skill.' },
+  { title: 'Conviction', detail: 'Turn values and belief into visible action.' },
+  { title: 'Adaptation', detail: 'Respond intelligently when conditions change.' },
+  { title: 'Integration', detail: 'Carry every path as one coherent life.' },
+] as const;
+
+export function getCycleProgress(cycleStartedAt: string, date = new Date()) {
+  const start = new Date(`${cycleStartedAt}T12:00:00`);
+  const current = new Date(date);
+  current.setHours(12, 0, 0, 0);
+  const elapsedDays = Math.max(0, Math.floor((current.getTime() - start.getTime()) / 86_400_000));
+  const day = (elapsedDays % 42) + 1;
+  const cycle = Math.floor(elapsedDays / 42) + 1;
+  const chapterIndex = Math.floor((day - 1) / 7);
+  return { day, cycle, chapterIndex, progress: day / 42, chapter: CYCLE_CHAPTERS[chapterIndex] };
+}
+
+export function getEvolutionIdentity(profile: OnboardingProfile | null) {
+  const current = normalizeProfile(profile);
+  const currentForms: Record<MomentumObstacle, string> = {
+    distraction: 'Scattered Seeker', energy: 'Depleted Striver', clarity: 'Unmapped Explorer',
+    belief: 'Unanchored Pilgrim', overwhelm: 'Overloaded Builder', alone: 'Solitary Starter', narrow: 'Specialized Striver',
+  };
+  return { current: currentForms[current.momentumObstacle], next: ARCHETYPE_META[current.archetype].evolved };
 }
 
 export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null): Quest[] {
@@ -314,24 +406,98 @@ export function getTodayTasks(track: TrackKey, profile: OnboardingProfile | null
   return deterministicShuffle(getTrackTasks(track, profile), `${localDateKey(date)}:${track}`).slice(0, 3);
 }
 
+export function getTodayCrossTraining(profile: OnboardingProfile | null, date = new Date()): Quest {
+  const current = normalizeProfile(profile);
+  const cue: Record<CoachingStyle, string> = {
+    demanding: 'Finish the rep. No negotiation.',
+    encouraging: 'Keep it light, honest, and complete.',
+    adaptive: 'Reduce the scope if needed, but make the attempt.',
+    direct: 'Do it before the day gets noisy.',
+  };
+  const pools: Record<TraitKey, Array<{ id: string; track: TrackKey; title: string; detail: string }>> = {
+    wit: [
+      { id: 'angle', track: 'mind', title: 'Find the unexpected angle', detail: 'Take one ordinary annoyance and write three playful comparisons for it.' },
+      { id: 'story', track: 'soul', title: 'Tell a story with a turn', detail: 'Retell one small event with a clear setup, one vivid detail, and a surprising ending.' },
+      { id: 'observe', track: 'mind', title: 'Collect comic observations', detail: 'Notice three harmless contradictions or absurd details in ordinary life.' },
+    ],
+    adaptability: [
+      { id: 'backup', track: 'mind', title: 'Build a second route', detail: 'Choose today’s main plan and write one smaller version that still counts.' },
+      { id: 'constraint', track: 'freedom', title: 'Create under constraint', detail: 'Solve one task using half the time, tools, or steps you normally expect.' },
+      { id: 'reframe', track: 'mind', title: 'Ask what is still possible', detail: 'Name one changed condition, then list three useful moves that remain.' },
+    ],
+    courage: [
+      { id: 'avoided', track: 'soul', title: 'Approach one avoided action', detail: 'Take the smallest respectful step toward something useful you have delayed.' },
+      { id: 'preference', track: 'soul', title: 'State one honest preference', detail: 'Express what you genuinely prefer without aggression or apology.' },
+      { id: 'ask', track: 'freedom', title: 'Make the clean ask', detail: 'Request the information, opportunity, feedback, or help you actually need.' },
+    ],
+    social: [
+      { id: 'follow-up', track: 'soul', title: 'Ask the second question', detail: 'Listen fully, then ask one follow-up that proves you heard the first answer.' },
+      { id: 'detail', track: 'soul', title: 'Remember one human detail', detail: 'Recall something important to another person and check in without an agenda.' },
+      { id: 'appreciation', track: 'soul', title: 'Give precise appreciation', detail: 'Thank someone for a specific action and explain why it mattered.' },
+    ],
+    creativity: [
+      { id: 'ten-uses', track: 'mind', title: 'Generate ten uses', detail: 'Choose an everyday object or idea and invent ten different uses for it.' },
+      { id: 'collision', track: 'mind', title: 'Combine distant ideas', detail: 'Join two unrelated interests and sketch one product, story, or solution.' },
+      { id: 'versions', track: 'freedom', title: 'Make three versions', detail: 'Create a safe, bold, and strange version of the same idea before choosing.' },
+    ],
+    practical: [
+      { id: 'repair', track: 'freedom', title: 'Learn one useful repair', detail: 'Understand or complete one small household, digital, or administrative fix.' },
+      { id: 'checklist', track: 'freedom', title: 'Turn memory into a checklist', detail: 'Write the repeatable steps for something you keep solving from scratch.' },
+      { id: 'teach-back', track: 'mind', title: 'Explain how it works', detail: 'Choose one tool you use and explain its mechanism in plain language.' },
+    ],
+  };
+  const traits = Object.keys(TRAIT_META) as TraitKey[];
+  const trait = deterministicShuffle(traits, `${localDateKey(date)}:rounded-trait`)[0];
+  const item = deterministicShuffle(pools[trait], `${localDateKey(date)}:${trait}:exercise`)[0];
+  const meta = TRAIT_META[trait];
+  return {
+    id: `${item.track}-trait-${trait}-${item.id}`,
+    track: item.track,
+    title: item.title,
+    detail: `${item.detail} ${cue[current.coachingStyle]}`,
+    meta: `${meta.label.toUpperCase()} · 5 MIN`,
+    xp: 30,
+    trackColor: meta.color,
+    trackIcon: meta.icon,
+    trait,
+    kind: 'cross-training',
+  };
+}
+
+export function getFastingTargetHours(profile: OnboardingProfile | null) {
+  const current = normalizeProfile(profile);
+  return current.fastingPreference === 'experienced' ? 14 : 12;
+}
+
 export function getDailyQuests(profile: OnboardingProfile | null, date = new Date()) {
   const current = normalizeProfile(profile);
   const orderedTracks = [...current.priorityTracks, ...TRACKS.filter((track) => !current.priorityTracks.includes(track))];
-  const coreQuests = orderedTracks.map((track) => getTodayTasks(track, current, date)[0]);
-  if (current.time === 'ten') return coreQuests;
+  const coreQuests = orderedTracks.map((track) => ({ ...getTodayTasks(track, current, date)[0], kind: 'path' as const }));
+  const coachingCue: Record<CoachingStyle, string> = {
+    demanding: 'Complete the clean rep. No negotiation.',
+    encouraging: 'A small, complete attempt is real progress.',
+    adaptive: 'Reduce the scope if needed; keep the return.',
+    direct: 'Start before you negotiate with it.',
+  };
+  coreQuests[0] = { ...coreQuests[0], detail: `${coreQuests[0].detail} ${coachingCue[current.coachingStyle]}` };
+  const crossTraining = getTodayCrossTraining(current, date);
+  if (current.time !== 'forty') return [...coreQuests, crossTraining];
   const anchor = getTodayTasks(current.priorityTracks[0], current, date)[1];
-  return [coreQuests[0], { ...anchor, meta: `ANCHOR · ${anchor.meta}` }, ...coreQuests.slice(1)];
+  return [coreQuests[0], { ...anchor, kind: 'anchor', meta: `ANCHOR · ${anchor.meta}` }, ...coreQuests.slice(1), crossTraining];
 }
 
 export const BOOKS: Book[] = [
+  { id: 'guide-mind-last-fortress', track: 'mind', tier: 'starter', title: 'The Last Fortress', author: 'Growth Path', promise: 'A seven-day field guide for reclaiming attention, choosing your inputs, and strengthening deliberate thought.', practice: 'Complete the attention audit and choose one boundary that protects your mind today.', journeyDays: 7, readingStyles: ['practical', 'mixed', 'deep', 'exercises'], includedPdf: true },
   { id: 'mind-deep-work', track: 'mind', tier: 'deeper', title: 'Deep Work', author: 'Cal Newport', promise: 'Build the ability to concentrate without distraction.', practice: 'Schedule one protected focus block and define its finish line.', journeyDays: 14, readingStyles: ['practical', 'mixed', 'deep'] },
   { id: 'mind-meditations', track: 'mind', tier: 'deeper', title: 'Meditations', author: 'Marcus Aurelius', promise: 'Separate what you control from what you merely react to.', practice: 'Name one controllable response before the day begins.', journeyDays: 10, readingStyles: ['mixed', 'deep'] },
   { id: 'mind-atomic-habits', track: 'mind', tier: 'starter', title: 'Atomic Habits', author: 'James Clear', promise: 'Turn identity into small, repeatable systems.', practice: 'Make one good action obvious and one distraction harder to reach.', journeyDays: 14, readingStyles: ['practical', 'mixed', 'exercises'] },
   { id: 'mind-courage', track: 'mind', tier: 'starter', title: 'The Courage to Be Disliked', author: 'Ichiro Kishimi & Fumitake Koga', promise: 'Question the need to live for other people’s approval.', practice: 'Make one honest choice without rehearsing how it will look.', journeyDays: 12, readingStyles: ['mixed', 'deep'] },
+  { id: 'guide-body-capability', track: 'body', tier: 'starter', title: 'Physical Capability', author: 'Growth Path', promise: 'A seven-day field guide for building strength, energy, movement, and recovery from your real starting point.', practice: 'Take the capability baseline and choose the smallest repeatable movement session.', journeyDays: 7, readingStyles: ['practical', 'mixed', 'deep', 'exercises'], includedPdf: true },
   { id: 'body-built-to-move', track: 'body', tier: 'starter', title: 'Built to Move', author: 'Kelly & Juliet Starrett', promise: 'Use simple movement practices to protect everyday capacity.', practice: 'Choose one mobility test and practice its related movement.', journeyDays: 14, readingStyles: ['practical', 'mixed', 'exercises'] },
   { id: 'body-spark', track: 'body', tier: 'deeper', title: 'Spark', author: 'John J. Ratey', promise: 'Understand how movement supports learning, mood, and attention.', practice: 'Place a short walk before the work that needs your clearest mind.', journeyDays: 10, readingStyles: ['mixed', 'deep'] },
   { id: 'body-outlive', track: 'body', tier: 'deeper', title: 'Outlive', author: 'Peter Attia with Bill Gifford', promise: 'Think about health through long-term capacity instead of quick fixes.', practice: 'Choose one strength, aerobic, or recovery behavior to track this week.', journeyDays: 21, readingStyles: ['deep'] },
   { id: 'body-comfort-crisis', track: 'body', tier: 'starter', title: 'The Comfort Crisis', author: 'Michael Easter', promise: 'Use chosen difficulty to expand physical and mental capacity.', practice: 'Choose one safe inconvenience instead of the easiest available option.', journeyDays: 10, readingStyles: ['practical', 'mixed', 'exercises'] },
+  { id: 'guide-soul-conviction', track: 'soul', tier: 'starter', title: 'Lived Conviction', author: 'Growth Path', promise: 'A seven-day field guide for examining belief, clarifying values, and turning conviction into practice.', practice: 'Name one value you want your choices—not only your words—to prove today.', journeyDays: 7, readingStyles: ['practical', 'mixed', 'deep', 'exercises'], includedPdf: true },
   { id: 'soul-meaning', track: 'soul', tier: 'starter', title: 'Man’s Search for Meaning', author: 'Viktor E. Frankl', promise: 'Explore meaning as a way of meeting suffering and responsibility.', practice: 'Write the responsibility that your present situation is asking you to carry.', journeyDays: 10, readingStyles: ['mixed', 'deep'] },
   { id: 'soul-joy', track: 'soul', tier: 'starter', title: 'The Book of Joy', author: 'Dalai Lama, Desmond Tutu & Douglas Abrams', promise: 'Practice perspective, humility, humor, gratitude, and compassion.', practice: 'Use one difficult moment as a cue to widen your perspective.', journeyDays: 12, readingStyles: ['practical', 'mixed', 'exercises'] },
   { id: 'soul-road', track: 'soul', tier: 'deeper', title: 'The Road Less Traveled', author: 'M. Scott Peck', promise: 'Connect discipline, love, responsibility, and spiritual growth.', practice: 'Face one necessary discomfort instead of postponing it.', journeyDays: 14, readingStyles: ['mixed', 'deep'] },
@@ -339,6 +505,7 @@ export const BOOKS: Book[] = [
   { id: 'soul-bible', track: 'soul', tier: 'deeper', title: 'The Bible', author: 'Sacred text', promise: 'Deepen reflection through the scripture at the center of Christian faith.', practice: 'Read a short passage with trusted commentary, then write one action it calls for.', journeyDays: 21, readingStyles: ['mixed', 'deep'], beliefStyles: ['faith'], faithTraditions: ['christianity'] },
   { id: 'soul-gita', track: 'soul', tier: 'deeper', title: 'The Bhagavad Gita', author: 'Sacred text', promise: 'Reflect on duty, action, devotion, and the nature of the self.', practice: 'Read a short passage with trusted commentary and connect it to today’s duty.', journeyDays: 18, readingStyles: ['mixed', 'deep'], beliefStyles: ['faith'], faithTraditions: ['hinduism'] },
   { id: 'soul-dhammapada', track: 'soul', tier: 'deeper', title: 'The Dhammapada', author: 'Buddhist scripture', promise: 'Reflect on attention, conduct, suffering, and liberation.', practice: 'Carry one verse into the day and notice where it changes your response.', journeyDays: 14, readingStyles: ['practical', 'mixed', 'deep'], beliefStyles: ['faith', 'reflection'], faithTraditions: ['buddhism'] },
+  { id: 'guide-freedom-choose', track: 'freedom', tier: 'starter', title: 'The Power to Choose', author: 'Growth Path', promise: 'A seven-day field guide for creating financial room, valuable skills, and greater control over place and time.', practice: 'Define what freedom means in one concrete sentence, then identify today’s smallest leverage point.', journeyDays: 7, readingStyles: ['practical', 'mixed', 'deep', 'exercises'], freedomFocuses: ['financial', 'mobility', 'both'], includedPdf: true },
   { id: 'freedom-money', track: 'freedom', tier: 'starter', title: 'The Psychology of Money', author: 'Morgan Housel', promise: 'Understand how behavior shapes financial outcomes.', practice: 'Write one money rule that protects you from your worst impulse.', journeyDays: 12, readingStyles: ['practical', 'mixed', 'exercises'], freedomFocuses: ['financial', 'both'] },
   { id: 'freedom-company', track: 'freedom', tier: 'deeper', title: 'Company of One', author: 'Paul Jarvis', promise: 'Build a resilient business without treating growth as the only goal.', practice: 'Define what “enough” would look like for one business metric.', journeyDays: 12, readingStyles: ['practical', 'mixed', 'deep'], freedomFocuses: ['financial', 'both'] },
   { id: 'freedom-vagabonding', track: 'freedom', tier: 'starter', title: 'Vagabonding', author: 'Rolf Potts', promise: 'Treat long-term travel as a deliberate life choice rather than an escape.', practice: 'Estimate the time and money needed for one meaningful journey.', journeyDays: 10, readingStyles: ['practical', 'mixed'], freedomFocuses: ['mobility', 'both'] },
@@ -354,6 +521,7 @@ export function getRecommendedBooks(track: TrackKey, profile: OnboardingProfile 
     .filter((book) => !book.faithTraditions || (current.faithTradition ? book.faithTraditions.includes(current.faithTradition) : false))
     .map((book, index) => {
       let score = 0;
+      if (book.includedPdf) score += 8;
       if (book.readingStyles.includes(current.readingStyle)) score += 4;
       if (book.beliefStyles?.includes(current.beliefs)) score += 3;
       if (book.faithTraditions?.includes(current.faithTradition as FaithTradition)) score += 5;
@@ -371,6 +539,9 @@ export function getRecommendedBooks(track: TrackKey, profile: OnboardingProfile 
 
 export function getBookReason(book: Book, profile: OnboardingProfile | null) {
   const current = normalizeProfile(profile);
+  if (book.includedPdf) {
+    return `This original Growth Path guide turns your ${book.track} answers into a seven-day practice you can begin now.`;
+  }
   if (book.faithTraditions?.includes(current.faithTradition as FaithTradition)) {
     return 'You asked for a faith-rooted Soul path that respects your tradition.';
   }
@@ -410,6 +581,10 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     lastLevelUp: null,
     dailyXp: {},
     hapticsEnabled: true,
+    xpByTrait: emptyTraitXp(),
+    cycleStartedAt: todayKey(),
+    fastingStartedAt: null,
+    fastingSessions: [],
   });
   const [hydrated, setHydrated] = useState(false);
 
@@ -421,6 +596,10 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
         const today = todayKey();
         const legacyCompleted = Array.isArray(parsed.completed) ? parsed.completed : [];
         const xpByTrack = { ...emptyXp(), ...(parsed.xpByTrack ?? {}) };
+        const xpByTrait = { ...emptyTraitXp(), ...(parsed.xpByTrait ?? {}) };
+        const savedFastStartedAt = parsed.fastingStartedAt ?? null;
+        const fastAge = savedFastStartedAt ? Date.now() - Date.parse(savedFastStartedAt) : Number.POSITIVE_INFINITY;
+        const fastingStartedAt = fastAge >= 0 && fastAge < 24 * 60 * 60 * 1_000 ? savedFastStartedAt : null;
         setState({
           completedToday: parsed.lastActiveDate === today ? (parsed.completedToday ?? legacyCompleted) : [],
           totalCompleted: parsed.totalCompleted ?? legacyCompleted.length,
@@ -431,6 +610,10 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
           lastLevelUp: parsed.lastLevelUp ?? null,
           dailyXp: parsed.dailyXp ?? {},
           hapticsEnabled: parsed.hapticsEnabled ?? true,
+          xpByTrait,
+          cycleStartedAt: parsed.cycleStartedAt ?? today,
+          fastingStartedAt,
+          fastingSessions: parsed.fastingSessions ?? [],
         });
       })
       .catch(() => undefined)
@@ -452,7 +635,7 @@ useEffect(() => {
       profile: state.profile,
       hydrated,
       isComplete: (id) => state.completedToday.includes(id),
-      toggle: (id, track, xp) => {
+      toggle: (id, track, xp, trait) => {
         setState((current) => {
           const exists = current.completedToday.includes(id);
           if (current.hapticsEnabled) void Haptics.selectionAsync();
@@ -483,6 +666,7 @@ useEffect(() => {
             completedToday,
             totalCompleted: Math.max(0, current.totalCompleted + (exists ? -1 : 1)),
             xpByTrack: { ...current.xpByTrack, [track]: Math.max(0, current.xpByTrack[track] + xpChange) },
+            xpByTrait: trait ? { ...current.xpByTrait, [trait]: Math.max(0, current.xpByTrait[trait] + (exists ? -xp : xp)) } : current.xpByTrait,
             completedDates,
             lastActiveDate: date,
             lastLevelUp: leveledUp ? nextLevel : current.lastLevelUp,
@@ -491,7 +675,7 @@ useEffect(() => {
         });
       },
       setProfile: (profile) => setState((current) => ({ ...current, profile: normalizeProfile(profile) })),
-      resetOnboarding: () => setState((current) => ({ ...current, profile: null })),
+      resetOnboarding: () => setState((current) => ({ ...current, profile: null, fastingStartedAt: null })),
       totalCompleted: state.totalCompleted,
       totalXp,
       level,
@@ -503,6 +687,8 @@ useEffect(() => {
         ...(state.totalCompleted >= 1 ? ['First quest complete'] : []),
         ...(TRACKS.every((track) => state.completedToday.some((id) => id.startsWith(TRACK_PREFIXES[track]))) ? ['Four paths, one direction'] : []),
         ...(currentStreak >= 3 ? ['Three-day momentum'] : []),
+        ...(Object.values(state.xpByTrait).some((xp) => xp > 0) ? ['Cross-trained'] : []),
+        ...(Object.values(state.xpByTrait).every((xp) => xp > 0) ? ['Rounded apprentice'] : []),
         ...(totalXp >= 500 ? ['Becoming consistent'] : []),
       ],
       lastLevelUp: state.lastLevelUp,
@@ -510,6 +696,30 @@ useEffect(() => {
       weeklyXp: getWeeklyXp(state.dailyXp),
       hapticsEnabled: state.hapticsEnabled,
       setHapticsEnabled: (enabled) => setState((current) => ({ ...current, hapticsEnabled: enabled })),
+      traitXp: (trait) => state.xpByTrait[trait],
+      cycleStartedAt: state.cycleStartedAt,
+      fastingStartedAt: state.fastingStartedAt,
+      fastingSessions: state.fastingSessions,
+      startFast: () => setState((current) => {
+        const profile = normalizeProfile(current.profile);
+        if (current.fastingStartedAt || profile.fastingPreference === 'off' || profile.fastingSafety !== 'clear') return current;
+        if (current.hapticsEnabled) void Haptics.selectionAsync();
+        return { ...current, fastingStartedAt: new Date().toISOString() };
+      }),
+      finishFast: () => setState((current) => {
+        if (!current.fastingStartedAt) return current;
+        const endedAt = new Date();
+        const minutes = Math.max(0, Math.round((endedAt.getTime() - new Date(current.fastingStartedAt).getTime()) / 60_000));
+        if (current.hapticsEnabled) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const session: FastingSession = {
+          startedAt: current.fastingStartedAt,
+          endedAt: endedAt.toISOString(),
+          minutes,
+          targetHours: getFastingTargetHours(current.profile),
+        };
+        return { ...current, fastingStartedAt: null, fastingSessions: [...current.fastingSessions.slice(-19), session] };
+      }),
+      cancelFast: () => setState((current) => ({ ...current, fastingStartedAt: null })),
     };
   }, [hydrated, state]);
 

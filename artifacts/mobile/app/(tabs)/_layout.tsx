@@ -82,6 +82,13 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="evolve"
+        options={{
+          title: 'Evolve',
+          tabBarIcon: ({ color }) => <Feather name="hexagon" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="progress"
         options={{
           title: 'Progress',

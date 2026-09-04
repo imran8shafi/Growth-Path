@@ -28,6 +28,9 @@ export default function ProgressRoute() {
   const { totalCompleted, totalXp, level, levelProgress, currentStreak, achievements, trackCompleted, trackXp, weeklyXp, hapticsEnabled } = useProgress();
   const [selectedTrack, setSelectedTrack] = useState<TrackKey>('mind');
   const selected = TRACKS[selectedTrack];
+  const pathScores = (Object.keys(TRACKS) as TrackKey[]).map((track) => trackXp(track));
+  const strongestPath = Math.max(...pathScores);
+  const balanceScore = strongestPath === 0 ? 0 : Math.round((Math.min(...pathScores) / strongestPath) * 100);
   return (
     <ScreenShell>
       <View style={styles.pagePadding}>
@@ -45,6 +48,12 @@ export default function ProgressRoute() {
           <View style={styles.quickCard}><Feather name="check-circle" size={18} color="#4CD6B0" /><Text style={styles.quickNumber}>{totalCompleted}</Text><Text style={styles.quickLabel}>QUESTS</Text></View>
           <View style={styles.quickCard}><Feather name="award" size={18} color="#FFCC66" /><Text style={styles.quickNumber}>{achievements.length}</Text><Text style={styles.quickLabel}>BADGES</Text></View>
         </View>
+
+        <Animated.View entering={FadeInDown.delay(220).duration(500)} style={styles.balanceCard}>
+          <View style={styles.balanceTop}><View><Text style={styles.balanceEyebrow}>WHOLE-PERSON BALANCE</Text><Text style={styles.balanceTitle}>{balanceScore}% aligned</Text></View><View style={styles.balanceBadge}><Feather name="compass" size={20} color="#4CD6B0" /></View></View>
+          <View style={styles.balanceTrack}><View style={[styles.balanceFill, { width: `${Math.max(2, balanceScore)}%` }]} /></View>
+          <Text style={styles.balanceBody}>{balanceScore >= 70 ? 'Your four paths are developing together. Keep the range.' : 'Your weakest path sets the score. Train breadth without abandoning your strength.'}</Text>
+        </Animated.View>
 
         <Text style={styles.sectionTitle}>Momentum</Text>
         <MomentumChart points={weeklyXp} />
@@ -74,6 +83,7 @@ const styles = StyleSheet.create({
   levelTrack: { position: 'absolute', left: 17, right: 17, bottom: 18, height: 7, borderRadius: 7, backgroundColor: '#162B3A', overflow: 'hidden' }, levelFill: { height: '100%', borderRadius: 7, backgroundColor: '#55D6FF' },
   quickStats: { flexDirection: 'row', gap: 9, marginTop: 10 }, quickCard: { flex: 1, minHeight: 81, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(13,28,42,0.88)', borderWidth: 1, borderColor: '#203A4F' },
   quickNumber: { color: '#F6FBFF', fontFamily: nativeTheme.typography.sans.extrabold, fontSize: 18, marginTop: 4 }, quickLabel: { color: '#61788A', fontFamily: nativeTheme.typography.sans.bold, fontSize: 7.5, letterSpacing: 0.9, marginTop: 2 },
+  balanceCard: { marginTop: 10, borderRadius: 18, padding: 15, backgroundColor: 'rgba(13,28,42,0.9)', borderWidth: 1, borderColor: '#24465C' }, balanceTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, balanceEyebrow: { color: '#4CD6B0', fontFamily: nativeTheme.typography.sans.bold, fontSize: 8.5, letterSpacing: 1.35 }, balanceTitle: { color: '#F6FBFF', fontFamily: nativeTheme.typography.sans.extrabold, fontSize: 20, marginTop: 4 }, balanceBadge: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(76,214,176,0.12)' }, balanceTrack: { height: 6, borderRadius: 6, backgroundColor: '#172C3B', overflow: 'hidden', marginTop: 13 }, balanceFill: { height: '100%', borderRadius: 6, backgroundColor: '#4CD6B0' }, balanceBody: { color: '#91A7B8', fontFamily: nativeTheme.typography.sans.regular, fontSize: 10.5, lineHeight: 15, marginTop: 9 },
   sectionRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 28, marginBottom: 11 }, sectionTitle: { color: '#F6FBFF', fontFamily: nativeTheme.typography.sans.bold, fontSize: 18, marginTop: 28, marginBottom: 11 },
   sectionHint: { color: '#55D6FF', fontFamily: nativeTheme.typography.sans.bold, fontSize: 8.5, letterSpacing: 1.1 }, attributeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, attributeWrap: { width: '48.5%' },
   sectionTitleInline: { color: '#F6FBFF', fontFamily: nativeTheme.typography.sans.bold, fontSize: 18 },

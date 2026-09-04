@@ -1,12 +1,12 @@
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { type Href, router } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { ScreenHeader, ScreenShell, TRACKS } from '@/components/path-ui';
 import { nativeTheme } from '@/lib/native-theme';
-import { useProgress } from '@/context/progress';
+import { ARCHETYPE_META, getEvolutionIdentity, useProgress } from '@/context/progress';
 
 function SettingRow({ icon, color, title, detail, trailing, index, onPress }: { icon: keyof typeof Feather.glyphMap; color: string; title: string; detail: string; trailing?: React.ReactNode; index: number; onPress?: () => void }) {
   const scale = useSharedValue(1);
@@ -25,13 +25,17 @@ export default function SettingsRoute() {
   const secondaryFocus = profile?.priorityTracks?.[1] ? TRACKS[profile.priorityTracks[1]].label : 'Body';
   const freedomLabel = profile?.freedomFocus === 'financial' ? 'financial freedom' : profile?.freedomFocus === 'mobility' ? 'travel freedom' : 'money + mobility';
   const readingLabel = profile?.readingStyle === 'practical' ? 'practical reading' : profile?.readingStyle === 'deep' ? 'deep reading' : profile?.readingStyle === 'exercises' ? 'exercise first' : 'mixed reading';
+  const archetype = ARCHETYPE_META[profile?.archetype ?? 'sovereign'];
+  const identity = getEvolutionIdentity(profile);
+  const coachingLabel = profile?.coachingStyle === 'demanding' ? 'Demanding' : profile?.coachingStyle === 'encouraging' ? 'Encouraging' : profile?.coachingStyle === 'direct' ? 'Direct' : 'Adaptive';
+  const fastingLabel = profile?.fastingPreference === 'curious' ? 'Optional 12-hour window' : profile?.fastingPreference === 'experienced' ? 'Optional 14-hour window' : 'Off';
   return (
     <ScreenShell>
       <View style={styles.pagePadding}>
         <ScreenHeader eyebrow="SETTINGS" title="Make it yours." subtitle="Keep the system quiet, useful, and fitted to your real life." icon="sliders" />
-        <Animated.View entering={FadeInDown.delay(80).duration(500)} style={[styles.profileCard, { borderColor: `${focusConfig.color}45` }]}>
-          <View style={[styles.profileIcon, { backgroundColor: `${focusConfig.color}1D` }]}><Feather name={focusConfig.icon} size={24} color={focusConfig.color} /></View>
-          <View style={styles.profileCopy}><Text style={[styles.profileEyebrow, { color: focusConfig.color }]}>YOUR PRIORITY PATHS</Text><Text style={styles.profileTitle}>{focusConfig.label} + {secondaryFocus}</Text><Text style={styles.profileDetail}>{profile ? `${freedomLabel} · ${readingLabel}` : 'Retake onboarding to build your personal path.'}</Text></View>
+        <Animated.View entering={FadeInDown.delay(80).duration(500)} style={[styles.profileCard, { borderColor: `${archetype.color}45` }]}>
+          <View style={[styles.profileIcon, { backgroundColor: `${archetype.color}1D` }]}><Feather name="hexagon" size={24} color={archetype.color} /></View>
+          <View style={styles.profileCopy}><Text style={[styles.profileEyebrow, { color: archetype.color }]}>{archetype.label.toUpperCase()} ARCHETYPE</Text><Text style={styles.profileTitle}>{identity.current} → {identity.next}</Text><Text style={styles.profileDetail}>{profile ? `${focusConfig.label} + ${secondaryFocus} · ${freedomLabel} · ${readingLabel}` : 'Retake onboarding to build your personal path.'}</Text></View>
         </Animated.View>
 
         <Text style={styles.sectionTitle}>Experience</Text>
@@ -43,9 +47,12 @@ export default function SettingsRoute() {
 
         <Text style={styles.sectionTitle}>Your path</Text>
         <View style={styles.settingsCard}>
-          <SettingRow index={3} icon="refresh-cw" color="#4CD6B0" title="Retake your starting point" detail="Update your goals, capacity, and focus" onPress={() => { resetOnboarding(); router.replace('/onboarding'); }} />
-          <SettingRow index={4} icon="shield" color="#55D6FF" title="Local-first progress" detail="Your answers and XP stay on this device" />
-          <SettingRow index={5} icon="info" color="#91A7B8" title="About Growth Path" detail="Mind · Body · Soul · Freedom" />
+          <SettingRow index={3} icon="hexagon" color={archetype.color} title="Evolution cycle" detail={`${archetype.label} · 42 days · six chapters`} onPress={() => router.push('/evolve' as Href)} />
+          <SettingRow index={4} icon="message-circle" color="#8D7CFF" title="Coaching voice" detail={`${coachingLabel} guidance`} />
+          <SettingRow index={5} icon="clock" color="#FFCC66" title="Fasting protocol" detail={fastingLabel} onPress={() => router.push('/evolve' as Href)} />
+          <SettingRow index={6} icon="refresh-cw" color="#4CD6B0" title="Retake your starting point" detail="Update your goals, capacity, and focus" onPress={() => { resetOnboarding(); router.replace('/onboarding'); }} />
+          <SettingRow index={7} icon="shield" color="#55D6FF" title="Local-first progress" detail="Your answers and XP stay on this device" />
+          <SettingRow index={8} icon="info" color="#91A7B8" title="About Growth Path" detail="Mind · Body · Soul · Freedom · Human range" />
         </View>
 
         <Animated.View entering={FadeInDown.delay(420).duration(500)} style={styles.manifesto}>

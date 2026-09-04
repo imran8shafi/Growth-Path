@@ -11,7 +11,7 @@ import Animated, {
   withDelay, withRepeat, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type OnboardingProfile, type TrackKey, useProgress } from '@/context/progress';
+import { ARCHETYPE_META, getEvolutionIdentity, type OnboardingProfile, type TrackKey, useProgress } from '@/context/progress';
 import { nativeTheme } from '@/lib/native-theme';
 
 const C = {
@@ -41,6 +41,18 @@ const BASE_QUESTIONS: Question[] = [
     ],
   },
   {
+    key: 'archetype', pillar: 'YOUR NEXT FORM',
+    title: 'Who are you becoming?',
+    subtitle: 'Choose the identity that should guide your 42-day evolution cycle.',
+    options: [
+      { value: 'guardian', label: 'The Guardian', detail: 'Capable, courageous, and responsible.', icon: 'shield' },
+      { value: 'scholar', label: 'The Scholar', detail: 'Focused, thoughtful, and hard to mislead.', icon: 'book-open' },
+      { value: 'builder', label: 'The Builder', detail: 'Skilled, resourceful, and independent.', icon: 'tool' },
+      { value: 'pilgrim', label: 'The Pilgrim', detail: 'Grounded in meaning and honest belief.', icon: 'compass' },
+      { value: 'sovereign', label: 'The Sovereign', detail: 'Balanced across every part of life.', icon: 'hexagon' },
+    ],
+  },
+  {
     key: 'priorityTracks', pillar: 'YOUR PRIORITIES', mode: 'ranked',
     title: 'Which two paths need you most?',
     subtitle: 'Choose your first priority, then your second. All four paths remain part of your plan.',
@@ -52,13 +64,17 @@ const BASE_QUESTIONS: Question[] = [
     ],
   },
   {
-    key: 'consistency', pillar: 'YOUR PATTERN',
-    title: 'When you decide to change, what usually happens?',
-    subtitle: 'Be honest. The right plan starts with real life.',
+    key: 'momentumObstacle', pillar: 'YOUR PATTERN',
+    title: 'What most often breaks your momentum?',
+    subtitle: 'Your plan will respond to the real obstacle instead of blaming your willpower.',
     options: [
-      { value: 'fresh', label: 'I do not know where to start', detail: 'I need a clear first step.', icon: 'map-pin' },
-      { value: 'inconsistent', label: 'I start, then lose momentum', detail: 'Consistency is the hard part.', icon: 'refresh-cw' },
-      { value: 'steady', label: 'I already show up often', detail: 'I want to go deeper.', icon: 'trending-up' },
+      { value: 'distraction', label: 'Distraction', detail: 'My attention gets pulled everywhere.', icon: 'smartphone' },
+      { value: 'energy', label: 'Low energy', detail: 'I know what to do but feel drained.', icon: 'battery' },
+      { value: 'clarity', label: 'No clear plan', detail: 'I need the next step made obvious.', icon: 'map-pin' },
+      { value: 'belief', label: 'I stop believing', detail: 'Doubt takes over before results arrive.', icon: 'cloud' },
+      { value: 'overwhelm', label: 'Trying to do too much', detail: 'My plans collapse under their own weight.', icon: 'layers' },
+      { value: 'alone', label: 'Doing it alone', detail: 'I lose momentum without accountability.', icon: 'user' },
+      { value: 'narrow', label: 'I stay too narrow', detail: 'I am consistent, but only in one area.', icon: 'maximize-2' },
     ],
   },
   {
@@ -92,6 +108,16 @@ const BASE_QUESTIONS: Question[] = [
     ],
   },
   {
+    key: 'fastingPreference', pillar: 'OPTIONAL FASTING',
+    title: 'Should fasting be part of your Body path?',
+    subtitle: 'It is optional, hydration-first, and never rewarded for going longer.',
+    options: [
+      { value: 'off', label: 'No fasting', detail: 'Keep my plan focused on meals, movement, and recovery.', icon: 'x-circle' },
+      { value: 'curious', label: 'I am curious', detail: 'Offer a gentle 12-hour overnight window.', icon: 'clock' },
+      { value: 'experienced', label: 'I already fast', detail: 'Offer a conservative 14-hour window.', icon: 'repeat' },
+    ],
+  },
+  {
     key: 'ability', pillar: 'RIGHT CHALLENGE',
     title: 'What pace feels right for you now?',
     subtitle: 'A plan works when challenge and capacity match.',
@@ -99,6 +125,17 @@ const BASE_QUESTIONS: Question[] = [
       { value: 'starting', label: 'Gentle start', detail: 'Small wins. No overwhelm.', icon: 'feather' },
       { value: 'building', label: 'Steady build', detail: 'Enough challenge to grow.', icon: 'trending-up' },
       { value: 'advanced', label: 'Push me', detail: 'I am ready for deeper work.', icon: 'arrow-up-right' },
+    ],
+  },
+  {
+    key: 'coachingStyle', pillar: 'YOUR COACH',
+    title: 'How should the app challenge you?',
+    subtitle: 'The same task can feel completely different depending on how it speaks.',
+    options: [
+      { value: 'demanding', label: 'Firm and demanding', detail: 'Call me forward without excuses.', icon: 'target' },
+      { value: 'encouraging', label: 'Calm and encouraging', detail: 'Help me build confidence through completion.', icon: 'heart' },
+      { value: 'adaptive', label: 'Adaptive to my day', detail: 'Let me reduce scope without disappearing.', icon: 'sliders' },
+      { value: 'direct', label: 'Direct and concise', detail: 'Tell me what matters and let me act.', icon: 'arrow-right' },
     ],
   },
   {
@@ -192,10 +229,28 @@ const FAITH_QUESTION: Question = {
   ],
 };
 
+const FASTING_SAFETY_QUESTION: Question = {
+  key: 'fastingSafety', pillar: 'FASTING SAFETY',
+  title: 'Which statement fits you?',
+  subtitle: 'This is a conservative safety gate, not a medical diagnosis. When uncertain, choose clinician guidance.',
+  options: [
+    { value: 'clear', label: 'None of these apply', detail: 'I am an adult, not pregnant or breastfeeding, not underweight or frail, and have no eating-disorder history.', icon: 'check-circle' },
+    { value: 'blocked', label: 'One exclusion applies', detail: 'I am under 18, pregnant or breastfeeding, underweight or frail, or have an eating-disorder history.', icon: 'shield' },
+    { value: 'clinician', label: 'I need clinician guidance', detail: 'I have diabetes, use glucose-affecting medication, or have another relevant medical condition.', icon: 'user-check' },
+  ],
+};
+
 function getQuestions(answers: Partial<OnboardingProfile>) {
-  if (answers.beliefs !== 'faith') return BASE_QUESTIONS;
-  const beliefIndex = BASE_QUESTIONS.findIndex((question) => question.key === 'beliefs');
-  return [...BASE_QUESTIONS.slice(0, beliefIndex + 1), FAITH_QUESTION, ...BASE_QUESTIONS.slice(beliefIndex + 1)];
+  const questions = [...BASE_QUESTIONS];
+  if (answers.fastingPreference && answers.fastingPreference !== 'off') {
+    const fastingIndex = questions.findIndex((question) => question.key === 'fastingPreference');
+    questions.splice(fastingIndex + 1, 0, FASTING_SAFETY_QUESTION);
+  }
+  if (answers.beliefs === 'faith') {
+    const beliefIndex = questions.findIndex((question) => question.key === 'beliefs');
+    questions.splice(beliefIndex + 1, 0, FAITH_QUESTION);
+  }
+  return questions;
 }
 
 function Background({ children }: { children: React.ReactNode }) {
@@ -270,7 +325,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
       </Animated.View>
       <Animated.View entering={FadeInUp.delay(650).duration(600)} style={styles.introFooter}>
         <PrimaryButton label="Build my path" onPress={onStart} icon="arrow-right" />
-        <Text style={styles.microCopy}>About 2 minutes • No perfect answers</Text>
+        <Text style={styles.microCopy}>About 3 minutes • No perfect answers</Text>
       </Animated.View>
     </View>
   );
@@ -345,10 +400,11 @@ function QuestionScreen({ question, index, total, selected, direction, onSelect,
 
 const ANALYSIS_STEPS = [
   { label: 'Reading your mind pattern', threshold: 12, icon: 'book-open' as IconName },
-  { label: 'Mapping energy and recovery', threshold: 32, icon: 'activity' as IconName },
-  { label: 'Finding your inner anchors', threshold: 52, icon: 'sun' as IconName },
-  { label: 'Matching your daily capacity', threshold: 72, icon: 'clock' as IconName },
-  { label: 'Choosing your first quests', threshold: 94, icon: 'compass' as IconName },
+  { label: 'Mapping energy and recovery', threshold: 28, icon: 'activity' as IconName },
+  { label: 'Checking optional protocols', threshold: 44, icon: 'shield' as IconName },
+  { label: 'Finding your inner anchors', threshold: 60, icon: 'sun' as IconName },
+  { label: 'Choosing your cross-training', threshold: 77, icon: 'shuffle' as IconName },
+  { label: 'Building your 42-day cycle', threshold: 94, icon: 'compass' as IconName },
 ];
 
 function AnalysisScreen({ onDone }: { onDone: () => void }) {
@@ -386,7 +442,7 @@ function AnalysisScreen({ onDone }: { onDone: () => void }) {
 
 type Scores = Record<TrackKey, { now: number; potential: number }>;
 function calculateScores(a: Partial<OnboardingProfile>): Scores {
-  const consistency = a.consistency === 'steady' ? 18 : a.consistency === 'inconsistent' ? 8 : 3;
+  const consistency = a.momentumObstacle === 'narrow' ? 18 : a.momentumObstacle === 'clarity' ? 3 : 8;
   const time = a.time === 'forty' ? 14 : a.time === 'twenty' ? 9 : 5;
   const raw = {
     mind: 34 + consistency + (a.mindState === 'clear' ? 20 : a.mindState === 'stressed' ? 5 : 9),
@@ -412,24 +468,31 @@ function ScoreRow({ track, score, index }: { track: TrackKey; score: { now: numb
       <View style={styles.scoreTopRow}><View style={[styles.scoreIcon, { backgroundColor: `${meta.color}20` }]}><Feather name={meta.icon} size={16} color={meta.color} /></View>
         <Text style={styles.scoreLabel}>{meta.label}</Text><Text style={[styles.scoreValue, { color: meta.color }]}>{score.now}</Text></View>
       <View style={styles.scoreTrack}><View style={[styles.potentialMarker, { left: `${score.potential}%`, borderColor: meta.color }]} /><Animated.View style={[styles.scoreFill, { backgroundColor: meta.color }, bar]} /></View>
-      <Text style={styles.potentialText}>90-day potential {score.potential}</Text>
+      <Text style={styles.potentialText}>42-day potential {score.potential}</Text>
     </Animated.View>
   );
 }
 
 function ResultScreen({ answers, onContinue }: { answers: Partial<OnboardingProfile>; onContinue: () => void }) {
   const scores = useMemo(() => calculateScores(answers), [answers]); const focus = (answers.focusTrack ?? 'mind') as TrackKey;
+  const identity = getEvolutionIdentity(answers as OnboardingProfile);
+  const archetype = ARCHETYPE_META[answers.archetype ?? 'sovereign'];
   return (
-    <View style={styles.resultScreen}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.resultScreen}>
       <Animated.View entering={FadeInDown.duration(520)}>
         <View style={styles.completePill}><Feather name="check-circle" size={14} color={C.green} /><Text style={styles.completePillText}>PATH ANALYSIS COMPLETE</Text></View>
         <Text style={styles.resultTitle}>You do not need a new life.{`\n`}You need a clear next step.</Text>
         <Text style={styles.resultSubtitle}>This is a starting snapshot, not a score of your worth. Your strongest growth opportunity begins with {SCORE_META[focus].label.toLowerCase()}.</Text>
       </Animated.View>
+      <Animated.View entering={FadeInDown.delay(90).duration(520)} style={[styles.identityReveal, { borderColor: `${archetype.color}55` }]}>
+        <View style={styles.identitySide}><Text style={styles.identityLabel}>CURRENT FORM</Text><Text style={styles.identityCurrent}>{identity.current}</Text></View>
+        <View style={[styles.identityArrow, { backgroundColor: `${archetype.color}20` }]}><Feather name="arrow-right" size={17} color={archetype.color} /></View>
+        <View style={[styles.identitySide, styles.identityNext]}><Text style={[styles.identityLabel, { color: archetype.color }]}>NEXT FORM</Text><Text style={styles.identityNextText}>{identity.next}</Text></View>
+      </Animated.View>
       <View style={styles.scoreList}>{(Object.keys(scores) as TrackKey[]).map((track, index) => <ScoreRow key={track} track={track} score={scores[track]} index={index} />)}</View>
-      <View style={styles.resultLegend}><View style={styles.legendDot} /><Text style={styles.resultLegendText}>Marker = what consistent practice can unlock in 90 days</Text></View>
+      <View style={styles.resultLegend}><View style={styles.legendDot} /><Text style={styles.resultLegendText}>Marker = what your first 42-day cycle can begin to unlock</Text></View>
       <PrimaryButton label="See my first commitment" onPress={onContinue} icon="arrow-right" />
-    </View>
+    </ScrollView>
   );
 }
 
@@ -440,8 +503,8 @@ function CommitmentScreen({ answers, onUnlock }: { answers: Partial<OnboardingPr
   return (
     <View style={styles.commitScreen}>
       <Animated.View entering={FadeInDown.duration(520)} style={styles.commitCopy}>
-        <Text style={styles.commitKicker}>YOUR FIRST PROMISE</Text><Text style={styles.commitTitle}>For the next 7 days,{`\n`}just keep the path alive.</Text>
-        <Text style={styles.commitSubtitle}>On hard days, {time} is enough. Small actions are how a new identity becomes believable.</Text>
+        <Text style={styles.commitKicker}>YOUR 42-DAY CYCLE</Text><Text style={styles.commitTitle}>Six chapters.{`\n`}One more complete human.</Text>
+        <Text style={styles.commitSubtitle}>Begin with seven days of Foundation. On hard days, {time} is enough. Small actions make a new identity believable.</Text>
       </Animated.View>
       <Animated.View entering={FadeIn.delay(280).duration(600)} style={styles.promiseCard}>
         <View style={[styles.promiseIcon, { backgroundColor: `${SCORE_META[focus].color}20` }]}><Feather name={SCORE_META[focus].icon} size={22} color={SCORE_META[focus].color} /></View>
@@ -463,8 +526,8 @@ function CommitmentScreen({ answers, onUnlock }: { answers: Partial<OnboardingPr
 function ReadyScreen({ onDone }: { onDone: () => void }) {
   useEffect(() => { const timeout = setTimeout(onDone, 1500); return () => clearTimeout(timeout); }, [onDone]);
   return <View style={styles.readyScreen}><Animated.View entering={FadeIn.duration(450)}><BrandMark size={68} /></Animated.View>
-    <Animated.Text entering={FadeInUp.delay(250).duration(520)} style={styles.readyKicker}>PATH UNLOCKED</Animated.Text>
-    <Animated.Text entering={FadeInUp.delay(420).duration(520)} style={styles.readyTitle}>Start where you are.{`\n`}Return tomorrow.</Animated.Text>
+    <Animated.Text entering={FadeInUp.delay(250).duration(520)} style={styles.readyKicker}>EVOLUTION CYCLE UNLOCKED</Animated.Text>
+    <Animated.Text entering={FadeInUp.delay(420).duration(520)} style={styles.readyTitle}>Day one begins now.{`\n`}Become harder to limit.</Animated.Text>
     <Animated.View entering={FadeIn.delay(650).duration(500)} style={styles.readyLine} /></View>;
 }
 
@@ -472,7 +535,7 @@ export default function OnboardingRoute() {
   const insets = useSafeAreaInsets(); const { setProfile } = useProgress();
   const [stage, setStage] = useState<Stage>('intro'); const [questionIndex, setQuestionIndex] = useState(0); const [direction, setDirection] = useState(1);
   const [answers, setAnswers] = useState<Partial<OnboardingProfile>>({});
-  const questions = useMemo(() => getQuestions(answers), [answers.beliefs]);
+  const questions = useMemo(() => getQuestions(answers), [answers.beliefs, answers.fastingPreference]);
   const question = questions[questionIndex];
   const selected = question?.key === 'priorityTracks' ? answers.priorityTracks : answers[question?.key] as string | undefined;
   const canContinue = question?.mode === 'ranked' ? Array.isArray(selected) && selected.length === 2 : Boolean(selected);
@@ -495,12 +558,15 @@ export default function OnboardingRoute() {
     setAnswers((current) => {
       const nextAnswers = { ...current, [question.key]: value };
       if (question.key === 'beliefs' && value !== 'faith') delete nextAnswers.faithTradition;
+      if (question.key === 'fastingPreference' && value === 'off') delete nextAnswers.fastingSafety;
       return nextAnswers;
     });
   };
   const finish = () => {
     const priorityTracks = answers.priorityTracks ?? ['mind', 'body'];
-    setProfile({ ...answers, priorityTracks, focusTrack: priorityTracks[0] } as OnboardingProfile);
+    const consistency = answers.momentumObstacle === 'narrow' ? 'steady' : answers.momentumObstacle === 'clarity' ? 'fresh' : 'inconsistent';
+    const fastingSafety = answers.fastingPreference === 'off' ? 'blocked' : answers.fastingSafety ?? 'blocked';
+    setProfile({ ...answers, consistency, fastingSafety, priorityTracks, focusTrack: priorityTracks[0] } as OnboardingProfile);
     setStage('ready');
   };
   return (
@@ -544,9 +610,10 @@ const styles = StyleSheet.create({
   statusPanel: { marginTop: 30, padding: 18, borderRadius: 18, backgroundColor: 'rgba(13,28,42,0.9)', borderWidth: 1, borderColor: C.border }, statusTitle: { color: C.text, fontFamily: nativeTheme.typography.sans.bold, fontSize: 15, marginBottom: 13 },
   statusRow: { minHeight: 39, flexDirection: 'row', alignItems: 'center', gap: 11 }, statusIcon: { width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#142635' }, statusIconComplete: { backgroundColor: C.green },
   statusLabel: { color: C.subtle, fontFamily: nativeTheme.typography.sans.medium, fontSize: 13 }, statusLabelComplete: { color: C.text }, analysisNote: { color: C.subtle, fontFamily: nativeTheme.typography.sans.regular, textAlign: 'center', fontSize: 11, marginTop: 22 },
-  resultScreen: { flex: 1, paddingTop: 22, paddingBottom: 2 }, completePill: { alignSelf: 'flex-start', borderRadius: 99, backgroundColor: 'rgba(76,214,176,0.1)', borderWidth: 1, borderColor: 'rgba(76,214,176,0.24)', paddingHorizontal: 11, paddingVertical: 7, flexDirection: 'row', gap: 7, alignItems: 'center' },
+  resultScreen: { flexGrow: 1, paddingTop: 22, paddingBottom: 2 }, completePill: { alignSelf: 'flex-start', borderRadius: 99, backgroundColor: 'rgba(76,214,176,0.1)', borderWidth: 1, borderColor: 'rgba(76,214,176,0.24)', paddingHorizontal: 11, paddingVertical: 7, flexDirection: 'row', gap: 7, alignItems: 'center' },
   completePillText: { color: C.green, fontFamily: nativeTheme.typography.sans.bold, fontSize: 10, letterSpacing: 1.2 }, resultTitle: { color: C.text, fontFamily: nativeTheme.typography.sans.bold, fontSize: 26, lineHeight: 32, letterSpacing: -0.6, marginTop: 18 },
   resultSubtitle: { color: C.muted, fontFamily: nativeTheme.typography.sans.regular, fontSize: 12.5, lineHeight: 19, marginTop: 10 }, scoreList: { flex: 1, justifyContent: 'center', gap: 9, marginVertical: 14 },
+  identityReveal: { minHeight: 74, marginTop: 13, padding: 11, borderRadius: 15, borderWidth: 1, backgroundColor: 'rgba(13,28,42,0.9)', flexDirection: 'row', alignItems: 'center', gap: 9 }, identitySide: { flex: 1 }, identityNext: { alignItems: 'flex-end' }, identityLabel: { color: C.subtle, fontFamily: nativeTheme.typography.sans.bold, fontSize: 7.5, letterSpacing: 1 }, identityCurrent: { color: C.muted, fontFamily: nativeTheme.typography.sans.semibold, fontSize: 11.5, marginTop: 4 }, identityNextText: { color: C.text, fontFamily: nativeTheme.typography.sans.bold, fontSize: 11.5, marginTop: 4, textAlign: 'right' }, identityArrow: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   scoreCard: { borderRadius: 13, padding: 11, backgroundColor: 'rgba(13,28,42,0.86)', borderWidth: 1, borderColor: C.border }, scoreTopRow: { flexDirection: 'row', alignItems: 'center', gap: 9 }, scoreIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   scoreLabel: { color: C.text, flex: 1, fontFamily: nativeTheme.typography.sans.semibold, fontSize: 13 }, scoreValue: { fontFamily: nativeTheme.typography.sans.bold, fontSize: 14 }, scoreTrack: { height: 6, borderRadius: 6, backgroundColor: '#1B3040', overflow: 'visible', marginTop: 9 },
   scoreFill: { width: '100%', height: 6, borderRadius: 6, transformOrigin: 'left' }, potentialMarker: { position: 'absolute', zIndex: 2, top: -3, width: 2, height: 12, borderLeftWidth: 2 }, potentialText: { color: C.subtle, fontFamily: nativeTheme.typography.sans.medium, fontSize: 9.5, marginTop: 6, textAlign: 'right' },
