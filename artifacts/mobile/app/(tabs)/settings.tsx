@@ -51,7 +51,8 @@ export default function SettingsRoute() {
           <SettingRow index={4} icon="message-circle" color="#8D7CFF" title="Coaching voice" detail={`${coachingLabel} guidance`} />
           <SettingRow index={5} icon="clock" color="#FFCC66" title="Fasting protocol" detail={fastingLabel} onPress={() => router.push('/evolve' as Href)} />
           <SettingRow index={6} icon="refresh-cw" color="#4CD6B0" title="Retake your starting point" detail="Update your goals, capacity, and focus" onPress={() => { resetOnboarding(); router.replace('/onboarding'); }} />
-          <SettingRow index={7} icon="shield" color="#55D6FF" title="Local-first progress" detail="Your answers and XP stay on this device" />
+          <SettingRow index={7} icon="sliders" color="#4CD6B0" title="Learning from your practice" detail="Previous app days shape pace, variety, and focus. See Progress for the reasons." onPress={() => router.push('/progress')} />
+          <SettingRow index={7} icon="shield" color="#55D6FF" title="Local-first progress" detail="Your answers, practice history, and XP stay on this device" />
           <SettingRow index={8} icon="info" color="#91A7B8" title="About Growth Path" detail="Mind · Body · Soul · Freedom · Human range" />
         </View>
 

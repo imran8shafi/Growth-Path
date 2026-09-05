@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
 
 export type TrackKey = 'mind' | 'body' | 'soul' | 'freedom';
 export type Goal = 'discipline' | 'energy' | 'meaning' | 'autonomy';
@@ -25,6 +26,7 @@ export type FastingPreference = 'off' | 'curious' | 'experienced';
 export type FastingSafety = 'clear' | 'blocked' | 'clinician';
 export type TraitKey = 'wit' | 'adaptability' | 'courage' | 'social' | 'creativity' | 'practical';
 export type QuestKind = 'path' | 'anchor' | 'cross-training' | 'recovery';
+export type AdaptivePace = 'foundation' | 'recovery' | 'steady' | 'stretch';
 
 export type OnboardingProfile = {
   goal: Goal;
@@ -61,6 +63,7 @@ export type Quest = {
   trackIcon: string;
   trait?: TraitKey;
   kind?: QuestKind;
+  adaptivePace?: AdaptivePace;
 };
 
 export type FastingSession = {
@@ -68,6 +71,27 @@ export type FastingSession = {
   endedAt: string;
   minutes: number;
   targetHours: number;
+};
+
+export type CompletionEvent = {
+  questId: string;
+  date: string;
+  completedAt: string;
+  track: TrackKey;
+  trait?: TraitKey;
+  xp: number;
+};
+
+export type AdaptivePlan = {
+  date: string;
+  mode: AdaptivePace;
+  observedDays: number;
+  completionRate: number;
+  weakestTrack: TrackKey;
+  weakestTrait: TraitKey;
+  paceByTrack: Record<TrackKey, AdaptivePace>;
+  recentQuestIds: string[];
+  reason: string;
 };
 
 export type Book = {
@@ -100,6 +124,9 @@ type StoredState = {
   cycleStartedAt?: string;
   fastingStartedAt?: string | null;
   fastingSessions?: FastingSession[];
+  completionHistory?: CompletionEvent[];
+  observedDates?: string[];
+  dailyRewardDates?: string[];
   // Legacy field from the original local-first tracker.
   completed?: string[];
 };
@@ -118,6 +145,9 @@ type ProgressState = {
   cycleStartedAt: string;
   fastingStartedAt: string | null;
   fastingSessions: FastingSession[];
+  completionHistory: CompletionEvent[];
+  observedDates: string[];
+  dailyRewardDates: string[];
 };
 
 export type WeeklyXpPoint = {
@@ -151,6 +181,8 @@ type ProgressContextValue = {
   cycleStartedAt: string;
   fastingStartedAt: string | null;
   fastingSessions: FastingSession[];
+  adaptivePlan: AdaptivePlan;
+  planDate: Date;
   startFast: () => void;
   finishFast: () => void;
   cancelFast: () => void;
@@ -276,6 +308,64 @@ function deterministicShuffle<T>(items: T[], seedText: string) {
   return shuffled;
 }
 
+export const ADAPTIVE_PACE_META: Record<AdaptivePace, { label: string; detail: string; color: string }> = {
+  foundation: { label: 'Learning you', detail: 'Your onboarding answers set the starting level.', color: '#55D6FF' },
+  recovery: { label: 'Reduce friction', detail: 'The plan is shrinking the first step so returning feels possible.', color: '#FFCC66' },
+  steady: { label: 'Build consistency', detail: 'The workload is holding steady while your evidence accumulates.', color: '#4CD6B0' },
+  stretch: { label: 'Raise the standard', detail: 'Your recent consistency supports a slightly deeper challenge.', color: '#8D7CFF' },
+};
+
+export function buildAdaptivePlan(
+  history: CompletionEvent[],
+  observedDates: string[],
+  profile: OnboardingProfile | null,
+  date = new Date(),
+): AdaptivePlan {
+  const current = normalizeProfile(profile);
+  const today = localDateKey(date);
+  const analysisDates = Array.from(new Set(observedDates.filter((day) => day < today))).sort().slice(-14);
+  const dateSet = new Set(analysisDates);
+  const recentHistory = history.filter((event) => dateSet.has(event.date));
+  const pathHistory = recentHistory.filter((event) => !event.trait);
+  const observedDays = analysisDates.length;
+  const practicedPathDays = new Set(pathHistory.map((event) => `${event.date}:${event.track}`));
+  const completionRate = observedDays === 0 ? 0 : practicedPathDays.size / (observedDays * TRACKS.length);
+  const hasSignal = observedDays >= 3;
+  const trackCounts = TRACKS.reduce((counts, track) => ({ ...counts, [track]: new Set(pathHistory.filter((event) => event.track === track).map((event) => event.date)).size }), emptyXp());
+  const traitKeys = Object.keys(emptyTraitXp()) as TraitKey[];
+  const traitCounts = traitKeys.reduce((counts, trait) => ({ ...counts, [trait]: recentHistory.filter((event) => event.trait === trait).length }), emptyTraitXp());
+  const trackOrder = deterministicShuffle(TRACKS, `${today}:adaptive-track-tie`);
+  const weakestTrack = hasSignal
+    ? [...trackOrder].sort((left, right) => trackCounts[left] - trackCounts[right])[0]
+    : current.priorityTracks[0];
+  const traitOrder = deterministicShuffle(traitKeys, `${today}:adaptive-trait-tie`);
+  const weakestTrait = hasSignal
+    ? [...traitOrder].sort((left, right) => traitCounts[left] - traitCounts[right])[0]
+    : traitOrder[0];
+  const paceFor = (track: TrackKey): AdaptivePace => {
+    if (!hasSignal) return 'foundation';
+    const rate = trackCounts[track] / Math.max(1, observedDays);
+    if (rate < 0.45) return 'recovery';
+    if (track !== 'body' && observedDays >= 5 && rate >= 0.8) return 'stretch';
+    return 'steady';
+  };
+  const paceByTrack = TRACKS.reduce((paces, track) => ({ ...paces, [track]: paceFor(track) }), {} as Record<TrackKey, AdaptivePace>);
+  const mode: AdaptivePace = !hasSignal ? 'foundation' : completionRate < 0.45 ? 'recovery' : completionRate >= 0.78 && observedDays >= 5 ? 'stretch' : 'steady';
+  const reason = !hasSignal
+    ? 'Your onboarding answers set the baseline. Once you have visited on three previous days, your recorded practice begins shaping the plan.'
+    : mode === 'recovery'
+    ? `Recent follow-through is ${Math.round(completionRate * 100)}%. Today lowers friction and puts ${weakestTrack} first.`
+    : mode === 'stretch'
+    ? `You practiced ${Math.round(completionRate * 100)}% of your daily paths on recorded days. Focus exercises can go a little deeper within your chosen time.`
+    : `${weakestTrack} has the least recent practice, so it receives today’s first position and adaptive emphasis.`;
+  const recentQuestIds = [...recentHistory]
+    .sort((left, right) => right.completedAt.localeCompare(left.completedAt))
+    .map((event) => event.questId)
+    .filter((id, index, all) => all.indexOf(id) === index)
+    .slice(0, 24);
+  return { date: today, mode, observedDays, completionRate, weakestTrack, weakestTrait, paceByTrack, recentQuestIds, reason };
+}
+
 export const ARCHETYPE_META: Record<Archetype, { label: string; evolved: string; description: string; icon: string; color: string }> = {
   guardian: { label: 'Guardian', evolved: 'Steadfast Guardian', description: 'Capability, courage, and responsibility.', icon: 'shield', color: '#4CD6B0' },
   scholar: { label: 'Scholar', evolved: 'Focused Scholar', description: 'Attention, understanding, and clear judgment.', icon: 'book-open', color: '#55D6FF' },
@@ -322,10 +412,10 @@ export function getEvolutionIdentity(profile: OnboardingProfile | null) {
   return { current: currentForms[current.momentumObstacle], next: ARCHETYPE_META[current.archetype].evolved };
 }
 
-export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null): Quest[] {
+export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null, adaptive?: AdaptivePlan): Quest[] {
   const current = normalizeProfile(profile);
-  const timeLabel = current.time === 'ten' ? '10 MIN' : current.time === 'forty' ? '40 MIN' : '20 MIN';
-  const effortLabel = current.ability === 'starting' ? 'STARTER' : current.ability === 'advanced' ? 'DEEPEN' : 'BUILD';
+  const adaptivePace = adaptive?.paceByTrack[track] ?? 'foundation';
+  const effortLabel = adaptivePace === 'recovery' ? 'RECOVERY REP' : adaptivePace === 'stretch' ? 'STRETCH' : current.ability === 'starting' ? 'STARTER' : current.ability === 'advanced' ? 'DEEPEN' : 'BUILD';
   const consistencyLabel = current.consistency === 'steady' ? effortLabel : current.consistency === 'inconsistent' ? 'KEEP IT ALIVE' : 'FIRST STEP';
   const trackColors: Record<TrackKey, string> = {
     mind: '#55D6FF',
@@ -341,19 +431,23 @@ export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null
     freedom: 'key',
   };
   const priorityBonus = current.priorityTracks.includes(track) ? 5 : 0;
+  const adaptiveBonus = adaptivePace === 'stretch' ? 5 : 0;
   const quest = (id: string, title: string, detail: string, meta: string, xp: number): Quest => ({
     id,
     track,
     title,
     detail,
     meta,
-    xp: xp + priorityBonus,
+    xp: xp + priorityBonus + adaptiveBonus,
     trackColor: trackColors[track],
     trackIcon: trackIcons[track],
+    adaptivePace,
   });
-  const shortMinutes = current.time === 'ten' ? 5 : current.time === 'forty' ? 20 : 10;
-  const focusMinutes = current.time === 'ten' ? 10 : current.time === 'forty' ? 40 : 20;
-  const strengthRounds = current.ability === 'starting' ? 1 : current.ability === 'advanced' ? 4 : 2;
+  const scaleMinutes = (minutes: number) => adaptivePace === 'recovery' ? Math.max(2, Math.round(minutes * 0.6)) : minutes;
+  const shortMinutes = scaleMinutes(current.time === 'ten' ? 5 : current.time === 'forty' ? 20 : 10);
+  const focusMinutes = scaleMinutes(current.time === 'ten' ? 10 : current.time === 'forty' ? 40 : 20);
+  const baseRounds = current.ability === 'starting' ? 1 : current.ability === 'advanced' ? 4 : 2;
+  const strengthRounds = Math.max(1, baseRounds - (adaptivePace === 'recovery' ? 1 : 0));
   const hasMovementLimit = current.movementLimit !== 'none';
 
   const tasks: Record<TrackKey, Quest[]> = {
@@ -399,14 +493,33 @@ export function getTrackTasks(track: TrackKey, profile: OnboardingProfile | null
     ],
   };
 
-  return tasks[track];
+  return tasks[track].map((task) => {
+    if (adaptivePace === 'stretch' && track !== 'body') {
+      const deeper: Record<Exclude<TrackKey, 'body'>, string> = {
+        mind: 'Use the final minute to explain the idea from memory and name one application.',
+        soul: 'Close by naming one action that will put this reflection into practice.',
+        freedom: 'Finish with one concrete output and a clear next step.',
+      };
+      return { ...task, detail: `${task.detail} ${deeper[track]}`, meta: `DEEPER · ${task.meta}` };
+    }
+    if (adaptivePace === 'recovery') return { ...task, detail: `${task.detail} Keep this to one small, comfortable attempt; partial scope counts.`, meta: `LIGHTER · ${task.meta}` };
+    return task;
+  });
 }
 
-export function getTodayTasks(track: TrackKey, profile: OnboardingProfile | null, date = new Date()) {
-  return deterministicShuffle(getTrackTasks(track, profile), `${localDateKey(date)}:${track}`).slice(0, 3);
+export function getTodayTasks(track: TrackKey, profile: OnboardingProfile | null, date = new Date(), adaptive?: AdaptivePlan) {
+  const tasks = deterministicShuffle(getTrackTasks(track, profile, adaptive), `${localDateKey(date)}:${track}`);
+  if (!adaptive?.recentQuestIds.length) return tasks.slice(0, 3);
+  return tasks.sort((left, right) => {
+    const leftRecent = adaptive.recentQuestIds.indexOf(left.id);
+    const rightRecent = adaptive.recentQuestIds.indexOf(right.id);
+    if (leftRecent === -1 && rightRecent !== -1) return -1;
+    if (rightRecent === -1 && leftRecent !== -1) return 1;
+    return rightRecent - leftRecent;
+  }).slice(0, 3);
 }
 
-export function getTodayCrossTraining(profile: OnboardingProfile | null, date = new Date()): Quest {
+export function getTodayCrossTraining(profile: OnboardingProfile | null, date = new Date(), adaptive?: AdaptivePlan): Quest {
   const current = normalizeProfile(profile);
   const cue: Record<CoachingStyle, string> = {
     demanding: 'Finish the rep. No negotiation.',
@@ -447,8 +560,9 @@ export function getTodayCrossTraining(profile: OnboardingProfile | null, date = 
     ],
   };
   const traits = Object.keys(TRAIT_META) as TraitKey[];
-  const trait = deterministicShuffle(traits, `${localDateKey(date)}:rounded-trait`)[0];
-  const item = deterministicShuffle(pools[trait], `${localDateKey(date)}:${trait}:exercise`)[0];
+  const trait = adaptive && adaptive.observedDays >= 3 ? adaptive.weakestTrait : deterministicShuffle(traits, `${localDateKey(date)}:rounded-trait`)[0];
+  const shuffledItems = deterministicShuffle(pools[trait], `${localDateKey(date)}:${trait}:exercise`);
+  const item = shuffledItems.find((candidate) => !adaptive?.recentQuestIds.includes(`${candidate.track}-trait-${trait}-${candidate.id}`)) ?? shuffledItems[0];
   const meta = TRAIT_META[trait];
   return {
     id: `${item.track}-trait-${trait}-${item.id}`,
@@ -461,6 +575,7 @@ export function getTodayCrossTraining(profile: OnboardingProfile | null, date = 
     trackIcon: meta.icon,
     trait,
     kind: 'cross-training',
+    adaptivePace: adaptive?.mode ?? 'foundation',
   };
 }
 
@@ -469,20 +584,23 @@ export function getFastingTargetHours(profile: OnboardingProfile | null) {
   return current.fastingPreference === 'experienced' ? 14 : 12;
 }
 
-export function getDailyQuests(profile: OnboardingProfile | null, date = new Date()) {
+export function getDailyQuests(profile: OnboardingProfile | null, date = new Date(), adaptive?: AdaptivePlan) {
   const current = normalizeProfile(profile);
-  const orderedTracks = [...current.priorityTracks, ...TRACKS.filter((track) => !current.priorityTracks.includes(track))];
-  const coreQuests = orderedTracks.map((track) => ({ ...getTodayTasks(track, current, date)[0], kind: 'path' as const }));
+  const adaptiveLead = adaptive && adaptive.observedDays >= 3 ? [adaptive.weakestTrack] : [];
+  const orderedTracks = Array.from(new Set([...adaptiveLead, ...current.priorityTracks, ...TRACKS])) as TrackKey[];
+  const coreQuests = orderedTracks.map((track) => ({ ...getTodayTasks(track, current, date, adaptive)[0], kind: 'path' as const }));
   const coachingCue: Record<CoachingStyle, string> = {
     demanding: 'Complete the clean rep. No negotiation.',
     encouraging: 'A small, complete attempt is real progress.',
     adaptive: 'Reduce the scope if needed; keep the return.',
     direct: 'Start before you negotiate with it.',
   };
-  coreQuests[0] = { ...coreQuests[0], detail: `${coreQuests[0].detail} ${coachingCue[current.coachingStyle]}` };
-  const crossTraining = getTodayCrossTraining(current, date);
-  if (current.time !== 'forty') return [...coreQuests, crossTraining];
-  const anchor = getTodayTasks(current.priorityTracks[0], current, date)[1];
+  const leadCue = adaptive?.paceByTrack[orderedTracks[0]] === 'recovery' ? 'Begin with the smallest useful step. Returning is enough today.' : coachingCue[current.coachingStyle];
+  coreQuests[0] = { ...coreQuests[0], detail: `${coreQuests[0].detail} ${leadCue}` };
+  const crossTraining = getTodayCrossTraining(current, date, adaptive);
+  if (current.time !== 'forty' || adaptive?.mode === 'recovery') return [...coreQuests, crossTraining];
+  const anchorTrack = adaptive?.weakestTrack ?? current.priorityTracks[0];
+  const anchor = getTodayTasks(anchorTrack, current, date, adaptive)[1];
   return [coreQuests[0], { ...anchor, kind: 'anchor', meta: `ANCHOR · ${anchor.meta}` }, ...coreQuests.slice(1), crossTraining];
 }
 
@@ -570,6 +688,19 @@ export function getBookReason(book: Book, profile: OnboardingProfile | null) {
 
 const ProgressContext = createContext<ProgressContextValue | null>(null);
 
+export function advanceProgressDay(current: ProgressState, date = new Date()): ProgressState {
+  const today = localDateKey(date);
+  if (current.lastActiveDate === today && (!current.profile || current.observedDates.includes(today))) return current;
+  const observedDates = Array.from(new Set([...current.observedDates, ...(current.profile ? [today] : [])])).sort().slice(-45);
+  return {
+    ...current,
+    completedToday: current.lastActiveDate === today ? current.completedToday : [],
+    lastActiveDate: today,
+    observedDates,
+    completionHistory: current.completionHistory.filter((event) => observedDates.includes(event.date)),
+  };
+}
+
 export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<ProgressState>({
     completedToday: [],
@@ -585,6 +716,9 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     cycleStartedAt: todayKey(),
     fastingStartedAt: null,
     fastingSessions: [],
+    completionHistory: [],
+    observedDates: [],
+    dailyRewardDates: [],
   });
   const [hydrated, setHydrated] = useState(false);
 
@@ -600,6 +734,8 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
         const savedFastStartedAt = parsed.fastingStartedAt ?? null;
         const fastAge = savedFastStartedAt ? Date.now() - Date.parse(savedFastStartedAt) : Number.POSITIVE_INFINITY;
         const fastingStartedAt = fastAge >= 0 && fastAge < 24 * 60 * 60 * 1_000 ? savedFastStartedAt : null;
+        const observedDates = Array.from(new Set([...(parsed.observedDates ?? []), ...(parsed.profile ? [today] : [])])).sort().slice(-45);
+        const completionHistory = Array.isArray(parsed.completionHistory) ? parsed.completionHistory.filter((event) => observedDates.includes(event.date)) : [];
         setState({
           completedToday: parsed.lastActiveDate === today ? (parsed.completedToday ?? legacyCompleted) : [],
           totalCompleted: parsed.totalCompleted ?? legacyCompleted.length,
@@ -614,13 +750,25 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
           cycleStartedAt: parsed.cycleStartedAt ?? today,
           fastingStartedAt,
           fastingSessions: parsed.fastingSessions ?? [],
+          completionHistory,
+          observedDates,
+          dailyRewardDates: parsed.dailyRewardDates ?? [],
         });
       })
       .catch(() => undefined)
       .finally(() => setHydrated(true));
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
+    if (!hydrated) return;
+    const markObserved = () => setState((current) => advanceProgressDay(current));
+    markObserved();
+    const subscription = AppState.addEventListener('change', (nextState) => { if (nextState === 'active') markObserved(); });
+    const timer = setInterval(() => { if (AppState.currentState === 'active') markObserved(); }, 60_000);
+    return () => { subscription.remove(); clearInterval(timer); };
+  }, [hydrated]);
+
+  useEffect(() => {
     if (hydrated) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => undefined);
   }, [hydrated, state]);
 
@@ -629,6 +777,8 @@ useEffect(() => {
     const level = Math.floor(totalXp / 250) + 1;
     const levelProgress = (totalXp % 250) / 250;
     const currentStreak = calculateStreak(state.completedDates);
+    const planDate = new Date(`${state.lastActiveDate}T12:00:00`);
+    const adaptivePlan = buildAdaptivePlan(state.completionHistory, state.observedDates, state.profile, planDate);
 
     return {
       completedToday: state.completedToday,
@@ -637,15 +787,17 @@ useEffect(() => {
       isComplete: (id) => state.completedToday.includes(id),
       toggle: (id, track, xp, trait) => {
         setState((current) => {
+          // Refresh first when a tap races the midnight/foreground listener.
+          if (current.lastActiveDate !== todayKey()) return advanceProgressDay(current);
           const exists = current.completedToday.includes(id);
           if (current.hapticsEnabled) void Haptics.selectionAsync();
           const completedToday = exists
             ? current.completedToday.filter((item) => item !== id)
             : [...current.completedToday, id];
-          const hadAllPaths = TRACKS.every((path) => current.completedToday.some((item) => item.startsWith(TRACK_PREFIXES[path])));
-          const hasAllPaths = TRACKS.every((path) => completedToday.some((item) => item.startsWith(TRACK_PREFIXES[path])));
-          const dailyReward = !exists && !hadAllPaths && hasAllPaths ? 50 : 0;
-          const xpChange = exists ? -xp : xp + dailyReward;
+          const hasAllPaths = TRACKS.every((path) => completedToday.some((item) => item.startsWith(TRACK_PREFIXES[path]) && !item.includes('-trait-')));
+          const dailyReward = !exists && hasAllPaths && !current.dailyRewardDates.includes(todayKey()) ? 50 : 0;
+          const recordedXp = current.completionHistory.find((event) => event.questId === id && event.date === todayKey())?.xp ?? xp;
+          const xpChange = exists ? -recordedXp : xp + dailyReward;
           const previousTotalXp = Object.values(current.xpByTrack).reduce((sum, xp) => sum + xp, 0);
           const nextTotalXp = previousTotalXp + xpChange;
           const previousLevel = Math.floor(previousTotalXp / 250) + 1;
@@ -661,34 +813,41 @@ useEffect(() => {
             : current.completedDates.includes(date)
             ? current.completedDates
             : [...current.completedDates, date];
+          const completionHistory = exists
+            ? current.completionHistory.filter((event) => !(event.questId === id && event.date === date))
+            : [...current.completionHistory, { questId: id, date, completedAt: new Date().toISOString(), track, trait, xp }];
           return {
             ...current,
             completedToday,
             totalCompleted: Math.max(0, current.totalCompleted + (exists ? -1 : 1)),
             xpByTrack: { ...current.xpByTrack, [track]: Math.max(0, current.xpByTrack[track] + xpChange) },
-            xpByTrait: trait ? { ...current.xpByTrait, [trait]: Math.max(0, current.xpByTrait[trait] + (exists ? -xp : xp)) } : current.xpByTrait,
+            xpByTrait: trait ? { ...current.xpByTrait, [trait]: Math.max(0, current.xpByTrait[trait] + (exists ? -recordedXp : xp)) } : current.xpByTrait,
             completedDates,
             lastActiveDate: date,
             lastLevelUp: leveledUp ? nextLevel : current.lastLevelUp,
             dailyXp,
+            completionHistory,
+            dailyRewardDates: dailyReward ? [...current.dailyRewardDates, date].slice(-45) : current.dailyRewardDates,
+            observedDates: current.observedDates.includes(date) ? current.observedDates : [...current.observedDates, date].slice(-45),
           };
         });
       },
-      setProfile: (profile) => setState((current) => ({ ...current, profile: normalizeProfile(profile) })),
+      setProfile: (profile) => setState((current) => advanceProgressDay({ ...current, profile: normalizeProfile(profile) })),
       resetOnboarding: () => setState((current) => ({ ...current, profile: null, fastingStartedAt: null })),
       totalCompleted: state.totalCompleted,
       totalXp,
       level,
       levelProgress,
       currentStreak,
-      trackCompleted: (track) => state.completedToday.filter((id) => id.startsWith(TRACK_PREFIXES[track])).length,
+      trackCompleted: (track) => getTodayTasks(track, state.profile, planDate, adaptivePlan).filter((task) => state.completedToday.includes(task.id)).length,
       trackXp: (track) => state.xpByTrack[track],
       achievements: [
         ...(state.totalCompleted >= 1 ? ['First quest complete'] : []),
-        ...(TRACKS.every((track) => state.completedToday.some((id) => id.startsWith(TRACK_PREFIXES[track]))) ? ['Four paths, one direction'] : []),
+        ...(TRACKS.every((track) => state.completedToday.some((id) => id.startsWith(TRACK_PREFIXES[track]) && !id.includes('-trait-'))) ? ['Four paths, one direction'] : []),
         ...(currentStreak >= 3 ? ['Three-day momentum'] : []),
         ...(Object.values(state.xpByTrait).some((xp) => xp > 0) ? ['Cross-trained'] : []),
         ...(Object.values(state.xpByTrait).every((xp) => xp > 0) ? ['Rounded apprentice'] : []),
+        ...(adaptivePlan.observedDays >= 3 ? ['Plan learned your rhythm'] : []),
         ...(totalXp >= 500 ? ['Becoming consistent'] : []),
       ],
       lastLevelUp: state.lastLevelUp,
@@ -700,6 +859,8 @@ useEffect(() => {
       cycleStartedAt: state.cycleStartedAt,
       fastingStartedAt: state.fastingStartedAt,
       fastingSessions: state.fastingSessions,
+      adaptivePlan,
+      planDate,
       startFast: () => setState((current) => {
         const profile = normalizeProfile(current.profile);
         if (current.fastingStartedAt || profile.fastingPreference === 'off' || profile.fastingSafety !== 'clear') return current;

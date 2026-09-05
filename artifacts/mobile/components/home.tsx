@@ -4,6 +4,7 @@ import { type Href, useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInLeft, FadeInRight, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { AdaptiveInsight } from '@/components/adaptive-insight';
 import { DailyRing } from '@/components/progress-visuals';
 import { ScreenShell, TaskRow, TRACKS, type TrackConfig } from '@/components/path-ui';
 import { nativeTheme } from '@/lib/native-theme';
@@ -28,11 +29,11 @@ function PathCard({ track, completed, index, onPress }: { track: TrackConfig; co
 
 export function HomeScreen() {
   const router = useRouter();
-  const { profile, totalXp, level, levelProgress, currentStreak, isComplete, trackCompleted, cycleStartedAt } = useProgress();
-  const homeTasks = getDailyQuests(profile);
+  const { profile, totalXp, level, levelProgress, currentStreak, isComplete, trackCompleted, cycleStartedAt, adaptivePlan, planDate } = useProgress();
+  const homeTasks = getDailyQuests(profile, planDate, adaptivePlan);
   const doneToday = homeTasks.filter((task) => isComplete(task.id)).length;
   const allComplete = doneToday === homeTasks.length;
-  const focus = profile?.focusTrack ?? 'mind';
+  const focus = adaptivePlan.mode === 'foundation' ? profile?.focusTrack ?? 'mind' : adaptivePlan.weakestTrack;
   const cycle = getCycleProgress(cycleStartedAt);
   const identity = getEvolutionIdentity(profile);
   const archetype = ARCHETYPE_META[profile?.archetype ?? 'sovereign'];
@@ -70,7 +71,8 @@ export function HomeScreen() {
           <Animated.View entering={FadeInDown.delay(210).duration(470)} style={styles.statCard}><View style={[styles.statIcon, { backgroundColor: 'rgba(255,204,102,0.16)' }]}><Feather name="award" size={17} color="#FFCC66" /></View><View><Text style={styles.statValue}>{Math.round(levelProgress * 250)}</Text><Text style={styles.statLabel}>XP TO NEXT LEVEL</Text></View></Animated.View>
         </View>
 
-        <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>Today’s ritual</Text><Text style={styles.sectionSubtext}>Four paths + one rotating human skill</Text></View><Text style={styles.sectionMeta}>{doneToday}/{homeTasks.length} COMPLETE</Text></View>
+        <AdaptiveInsight />
+        <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>Today’s ritual</Text><Text style={styles.sectionSubtext}>Four paths + personalized human skill practice</Text></View><Text style={styles.sectionMeta}>{doneToday}/{homeTasks.length} COMPLETE</Text></View>
         <View style={styles.taskList}>{homeTasks.map((task, index) => <TaskRow key={task.id} {...task} trackColor={task.trackColor} index={index} />)}</View>
 
         <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>The four paths</Text><Text style={styles.sectionMeta}>EXPLORE</Text></View>

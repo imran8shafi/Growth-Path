@@ -9,6 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInLeft, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AdaptiveInsight } from '@/components/adaptive-insight';
 import { DailyRing } from '@/components/progress-visuals';
 import { nativeTheme } from '@/lib/native-theme';
 import type { Book, TrackKey, TraitKey } from '@/context/progress';
@@ -161,9 +162,9 @@ function BookCard({ book, color, reason, expanded, index, onPress }: { book: Boo
 
 export function TrackScreen({ track }: { track: TrackKey }) {
   const config = TRACKS[track];
-  const { profile, isComplete, hapticsEnabled } = useProgress();
+  const { profile, isComplete, hapticsEnabled, adaptivePlan, planDate } = useProgress();
   const router = useRouter();
-  const tasks = getTodayTasks(track, profile);
+  const tasks = getTodayTasks(track, profile, planDate, adaptivePlan);
   const books = getRecommendedBooks(track, profile);
   const completed = tasks.filter((task) => isComplete(task.id)).length;
   const [expandedBook, setExpandedBook] = useState<string | null>(books[0]?.id ?? null);
@@ -177,6 +178,7 @@ export function TrackScreen({ track }: { track: TrackKey }) {
           <View style={styles.pathHeroCopy}><Text style={[styles.heroEyebrow, { color: config.color }]}>TODAY’S SIGNAL</Text><Text style={styles.heroTitle}>{completed === 3 ? 'Path complete.' : `${3 - completed} quest${3 - completed === 1 ? '' : 's'} remain.`}</Text><Text style={styles.heroBody}>{config.benefit}</Text></View>
           <DailyRing completed={completed} total={3} size={104} />
         </Animated.View>
+        <AdaptiveInsight track={track} />
         <View style={styles.sectionRow}><Text style={styles.sectionLabel}>Today’s practice</Text><Text style={[styles.sectionMeta, { color: config.color }]}>{completed}/3 COMPLETE</Text></View>
         <View style={styles.taskList}>{tasks.map((task, index) => <TaskRow key={task.id} {...task} trackColor={config.color} index={index} />)}</View>
         <Animated.View entering={FadeInDown.delay(320).duration(520)} style={[styles.resourceCard, { borderColor: `${config.color}45` }]}>
