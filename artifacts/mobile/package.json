@@ -8,7 +8,8 @@
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:adaptive": "node scripts/test-adaptive.cjs"
+    "test:adaptive": "node scripts/test-adaptive.cjs",
+    "test:training": "node scripts/test-training.cjs"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -58,6 +59,8 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@react-navigation/native": "^7.3.16",
+    "expo-gl": "~16.0.10",
     "lightningcss": "^1.33.0"
   }
 }

@@ -11,6 +11,7 @@ import {
 import { EVIDENCE_COLORS, GROWTH_PROTOCOLS, type GrowthProtocol } from '@/lib/evolution';
 import { nativeTheme } from '@/lib/native-theme';
 import { AdaptiveInsight } from '@/components/adaptive-insight';
+import { TrainingHighlights } from '@/components/training-hub';
 
 type IconName = keyof typeof Feather.glyphMap;
 
@@ -115,7 +116,7 @@ export default function EvolveRoute() {
   const [expanded, setExpanded] = useState<string | null>('fasting');
   return <ScreenShell><View style={styles.pagePadding}>
     <ScreenHeader eyebrow="WHOLE-PERSON TRAINING" title="Become useful in every direction." subtitle="Build depth without becoming narrow: judgment, capability, conviction, freedom, humor, adaptability, courage, creativity, and human skill." icon="hexagon" color="#6DE3FF" />
-    <IdentityCard /><CycleCard /><AdaptiveInsight />
+    <IdentityCard /><CycleCard /><AdaptiveInsight /><TrainingHighlights />
     <View style={styles.sectionRow}><View><Text style={styles.sectionTitle}>Today’s cross-training</Text><Text style={styles.sectionSubtitle}>One rotating human skill beyond the four paths</Text></View><Text style={styles.sectionMeta}>+30 XP</Text></View>
     <TaskRow {...crossTraining} trackColor={crossTraining.trackColor} />
     <View style={styles.sectionRow}><View><Text style={styles.sectionTitle}>Human range</Text><Text style={styles.sectionSubtitle}>Train breadth without pretending to master everything</Text></View></View>

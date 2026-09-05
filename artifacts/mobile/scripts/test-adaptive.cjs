@@ -1,36 +1,6 @@
 // Exercise the actual planner and provider state transitions without a device runtime.
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-const ts = require('typescript');
-const source = fs.readFileSync(path.join(__dirname, '../context/progress.tsx'), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
-const slots = [];
-let cursor = 0;
-const React = {
-  createContext: () => ({ Provider: 'Provider' }),
-  createElement: (_type, props) => ({ props }),
-  useEffect: () => {},
-  useMemo: (fn) => fn(),
-  useState: (initial) => {
-    const slot = cursor++;
-    if (!(slot in slots)) slots[slot] = initial;
-    return [slots[slot], (value) => { slots[slot] = typeof value === 'function' ? value(slots[slot]) : value; }];
-  },
-};
-const moduleShim = { exports: {} };
-vm.runInNewContext(compiled, {
-  exports: moduleShim.exports, module: moduleShim, Date,
-  require: (name) => {
-    if (name === 'react') return React;
-    if (name === 'react-native') return { AppState: {} };
-    if (name === 'expo-haptics') return { selectionAsync: async () => {}, notificationAsync: async () => {}, NotificationFeedbackType: { Success: 'success' } };
-    if (name === '@react-native-async-storage/async-storage') return {};
-    throw new Error(`Unexpected dependency: ${name}`);
-  },
-});
-const { buildAdaptivePlan, getTodayTasks, getDailyQuests, getTodayCrossTraining, getTrackTasks, advanceProgressDay, ProgressProvider, getFastingTargetHours } = moduleShim.exports;
+const { slots, render, progress: { buildAdaptivePlan, getTodayTasks, getDailyQuests, getTodayCrossTraining, getTrackTasks, advanceProgressDay, getFastingTargetHours } } = require('./test-support.cjs');
 const date = new Date(2026, 8, 15, 12);
 const days = ['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14'];
 const tracks = ['mind', 'body', 'soul', 'freedom'];
@@ -77,7 +47,6 @@ const safeProfile = { ...profile, movementLimit: 'knees' };
 assert.match(getTrackTasks('body', safeProfile, full).find((task) => task.id === 'body-strength').detail, /already cleared/);
 assert.equal(getFastingTargetHours(profile), 12);
 
-const render = () => { cursor = 0; return ProgressProvider({ children: null }).props.value; };
 render().setProfile(profile);
 const currentDate = slots[0].lastActiveDate;
 render().toggle('mind-trait-wit-angle', 'mind', 30, 'wit');

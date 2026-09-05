@@ -2,18 +2,21 @@ import { Feather } from '@expo/vector-icons';
 import { Asset } from 'expo-asset';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeInLeft, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeInLeft, useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdaptiveInsight } from '@/components/adaptive-insight';
 import { DailyRing } from '@/components/progress-visuals';
+import { MagicRings } from '@/components/magic-rings';
 import { nativeTheme } from '@/lib/native-theme';
-import type { Book, TrackKey, TraitKey } from '@/context/progress';
-import { getBookReason, getRecommendedBooks, getTodayTasks, useProgress } from '@/context/progress';
+import { questChallenge, trainingTrackTasks } from '@/lib/training-catalog';
+import { sessionKey, type Challenge } from '@/lib/training-model';
+import type { Book, Quest, TrackKey } from '@/context/progress';
+import { getBookReason, getRecommendedBooks, useProgress } from '@/context/progress';
 
 type IconName = keyof typeof Feather.glyphMap;
 
@@ -59,14 +62,11 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
 
 export function ScreenShell({ children, scroll = true, contentStyle }: { children: React.ReactNode; scroll?: boolean; contentStyle?: ViewStyle }) {
   const insets = useSafeAreaInsets();
-  const drift = useSharedValue(0);
-  useEffect(() => { drift.value = withRepeat(withSequence(withTiming(1, { duration: 5200 }), withTiming(0, { duration: 5200 })), -1); }, [drift]);
-  const orb = useAnimatedStyle(() => ({ transform: [{ translateY: drift.value * 22 }, { scale: 0.96 + drift.value * 0.08 }], opacity: 0.18 + drift.value * 0.1 }));
   const content = <View style={[styles.shell, { paddingTop: insets.top + (Platform.OS === 'web' ? 22 : 6), paddingBottom: Math.max(insets.bottom, 18) + 88 }, contentStyle]}>{children}</View>;
   return (
     <LinearGradient colors={['#050A12', '#07131F', '#071B2A']} style={styles.background}>
       <StatusBar style="light" />
-      <Animated.View pointerEvents="none" style={[styles.ambientOrb, orb]} />
+      <MagicRings />
       {scroll ? <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>{content}</ScrollView> : content}
     </LinearGradient>
   );
@@ -84,25 +84,32 @@ export function ScreenHeader({ eyebrow, title, subtitle, icon, color = '#55D6FF'
   );
 }
 
-export function TaskRow({ id, track, title, detail, meta, xp, trackColor, trait, onPress, isComplete: completeProp, index = 0 }: {
-  id: string; track: TrackKey; title: string; detail: string; meta: string; xp: number; trackColor: string; trackIcon: string;
-  trait?: TraitKey; onPress?: () => void; isComplete?: boolean; index?: number;
+export function TaskRow({ onPress, isComplete: completeProp, index = 0, challenge: supplied, ...quest }: Quest & {
+  onPress?: () => void; isComplete?: boolean; index?: number; challenge?: Challenge;
 }) {
-  const { isComplete, toggle } = useProgress();
-  const complete = completeProp ?? isComplete(id);
+  const { isComplete, profile, training, planDate, cycleStartedAt, dispatchTraining } = useProgress();
+  const router = useRouter();
+  const challenge = supplied ?? questChallenge(quest, profile, training, planDate, cycleStartedAt);
+  const { id, title, detail, xp, trackColor } = challenge.quest;
+  const key = sessionKey(challenge);
+  const session = training.sessions[key];
+  const complete = completeProp ?? (training.results.some((result) => result.sessionKey === key) || isComplete(id));
   const scale = useSharedValue(1);
   const motion = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const handlePress = () => {
     scale.value = withSequence(withSpring(0.975), withSpring(complete ? 1 : 1.018), withSpring(1));
-    (onPress ?? (() => toggle(id, track, xp, trait)))();
+    if (onPress) { onPress(); return; }
+    const startChallenge = isComplete(id) && !training.results.some((result) => result.sessionKey === key) ? { ...challenge, quest: { ...challenge.quest, xp: 0 } } : challenge;
+    dispatchTraining({ type: 'start', challenge: startChallenge, now: new Date().toISOString() });
+    router.push(`/session?session=${encodeURIComponent(key)}` as Href);
   };
   return (
     <Animated.View entering={FadeInDown.delay(index * 70).duration(430)} style={motion}>
-      <Pressable testID={`task-${id}`} accessibilityRole="checkbox" accessibilityState={{ checked: complete }} onPress={handlePress} style={[styles.taskRow, complete && { borderColor: `${trackColor}65`, backgroundColor: `${trackColor}10` }]}>
+      <Pressable testID={`task-${id}`} accessibilityRole="button" accessibilityLabel={`${complete ? 'Review' : session ? 'Resume' : 'Start'} ${title}`} onPress={handlePress} style={[styles.taskRow, complete && { borderColor: `${trackColor}65`, backgroundColor: `${trackColor}10` }]}>
         <View style={[styles.taskAccent, { backgroundColor: trackColor }]} />
-        <View style={[styles.check, { borderColor: complete ? trackColor : '#355065', backgroundColor: complete ? trackColor : '#102235' }]}>{complete ? <Feather name="check" size={15} color="#050A12" /> : null}</View>
-        <View style={styles.taskCopy}><Text style={[styles.taskTitle, complete && styles.taskTitleComplete]}>{title}</Text><Text style={styles.taskDetail}>{detail}</Text></View>
-        <View style={styles.taskMetaWrap}><Text style={styles.taskMeta}>{meta}</Text><View style={[styles.xpPill, { backgroundColor: `${trackColor}1C` }]}><Text style={[styles.taskXp, { color: trackColor }]}>+{xp}</Text></View></View>
+        <View style={[styles.check, { borderColor: complete ? trackColor : '#355065', backgroundColor: complete ? trackColor : '#102235' }]}><Feather name={complete ? 'check' : 'play'} size={14} color={complete ? '#050A12' : trackColor} /></View>
+        <View style={styles.taskCopy}><Text style={styles.taskTitle}>{title}</Text><Text style={styles.taskDetail} numberOfLines={2}>{detail}</Text></View>
+        <View style={styles.taskMetaWrap}><Text style={styles.taskMeta}>{challenge.category.toUpperCase()}</Text><View style={[styles.xpPill, { backgroundColor: `${trackColor}1C` }]}><Text style={[styles.taskXp, { color: trackColor }]}>{complete ? 'VIEW' : session ? 'RESUME' : `+${xp}`}</Text></View></View>
       </Pressable>
     </Animated.View>
   );
@@ -162,9 +169,9 @@ function BookCard({ book, color, reason, expanded, index, onPress }: { book: Boo
 
 export function TrackScreen({ track }: { track: TrackKey }) {
   const config = TRACKS[track];
-  const { profile, isComplete, hapticsEnabled, adaptivePlan, planDate } = useProgress();
+  const { profile, isComplete, hapticsEnabled, adaptivePlan, planDate, cycleStartedAt } = useProgress();
   const router = useRouter();
-  const tasks = getTodayTasks(track, profile, planDate, adaptivePlan);
+  const tasks = trainingTrackTasks(track, profile, planDate, adaptivePlan, cycleStartedAt);
   const books = getRecommendedBooks(track, profile);
   const completed = tasks.filter((task) => isComplete(task.id)).length;
   const [expandedBook, setExpandedBook] = useState<string | null>(books[0]?.id ?? null);

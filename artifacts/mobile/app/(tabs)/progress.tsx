@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { AdaptiveInsight } from '@/components/adaptive-insight';
 import { MomentumChart } from '@/components/progress-visuals';
+import { SkillDashboard } from '@/components/training-hub';
 import { ScreenHeader, ScreenShell, TRACKS } from '@/components/path-ui';
 import { nativeTheme } from '@/lib/native-theme';
 import { type TrackKey, useProgress } from '@/context/progress';
@@ -56,6 +57,7 @@ export default function ProgressRoute() {
           <Text style={styles.balanceBody}>{balanceScore >= 70 ? 'Your four paths are developing together. Keep the range.' : 'Your weakest path sets the score. Train breadth without abandoning your strength.'}</Text>
         </Animated.View>
 
+        <SkillDashboard />
         <AdaptiveInsight detailed />
         <Text style={styles.sectionTitle}>Momentum</Text>
         <MomentumChart points={weeklyXp} />

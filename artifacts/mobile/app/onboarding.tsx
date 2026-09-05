@@ -11,6 +11,7 @@ import Animated, {
   withDelay, withRepeat, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MagicRings } from '@/components/magic-rings';
 import { ARCHETYPE_META, getEvolutionIdentity, type OnboardingProfile, type TrackKey, useProgress } from '@/context/progress';
 import { nativeTheme } from '@/lib/native-theme';
 
@@ -254,21 +255,10 @@ function getQuestions(answers: Partial<OnboardingProfile>) {
 }
 
 function Background({ children }: { children: React.ReactNode }) {
-  const drift = useSharedValue(0);
-  useEffect(() => {
-    drift.value = withRepeat(withSequence(withTiming(1, { duration: 5000 }), withTiming(0, { duration: 5000 })), -1);
-  }, [drift]);
-  const orbOne = useAnimatedStyle(() => ({
-    transform: [{ translateY: drift.value * 22 }, { scale: 0.96 + drift.value * 0.08 }], opacity: 0.28 + drift.value * 0.14,
-  }));
-  const orbTwo = useAnimatedStyle(() => ({
-    transform: [{ translateY: -drift.value * 18 }, { scale: 1.04 - drift.value * 0.06 }], opacity: 0.18 + drift.value * 0.1,
-  }));
   return (
     <LinearGradient colors={[C.bg, '#07131F', C.deep]} style={styles.background}>
       <StatusBar style="light" />
-      <Animated.View pointerEvents="none" style={[styles.orb, styles.orbOne, orbOne]} />
-      <Animated.View pointerEvents="none" style={[styles.orb, styles.orbTwo, orbTwo]} />
+      <MagicRings />
       {children}
     </LinearGradient>
   );
@@ -508,7 +498,7 @@ function CommitmentScreen({ answers, onUnlock }: { answers: Partial<OnboardingPr
       </Animated.View>
       <Animated.View entering={FadeIn.delay(280).duration(600)} style={styles.promiseCard}>
         <View style={[styles.promiseIcon, { backgroundColor: `${SCORE_META[focus].color}20` }]}><Feather name={SCORE_META[focus].icon} size={22} color={SCORE_META[focus].color} /></View>
-        <View style={styles.promiseCopy}><Text style={styles.promiseLabel}>BEGIN WITH {SCORE_META[focus].label.toUpperCase()}</Text><Text style={styles.promiseText}>One clear quest each day. You can always do more—but you never need to do everything.</Text></View>
+        <View style={styles.promiseCopy}><Text style={styles.promiseLabel}>BEGIN WITH {SCORE_META[focus].label.toUpperCase()}</Text><Text style={styles.promiseText}>Start a challenge, practice inside the session, and record what happened. Begin with one; explore the others when you have room.</Text></View>
       </Animated.View>
       <Animated.View entering={FadeInUp.delay(420).duration(520)} style={styles.holdArea}>
         <Pressable accessibilityRole="button" accessibilityLabel="Hold to begin your path" delayLongPress={900}

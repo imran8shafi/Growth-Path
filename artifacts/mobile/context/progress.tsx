@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import { emptyTraining, reduceTraining, type TrainingAction, type TrainingState } from '../lib/training-model';
 
 export type TrackKey = 'mind' | 'body' | 'soul' | 'freedom';
 export type Goal = 'discipline' | 'energy' | 'meaning' | 'autonomy';
@@ -127,6 +128,7 @@ type StoredState = {
   completionHistory?: CompletionEvent[];
   observedDates?: string[];
   dailyRewardDates?: string[];
+  training?: TrainingState;
   // Legacy field from the original local-first tracker.
   completed?: string[];
 };
@@ -148,6 +150,7 @@ type ProgressState = {
   completionHistory: CompletionEvent[];
   observedDates: string[];
   dailyRewardDates: string[];
+  training: TrainingState;
 };
 
 export type WeeklyXpPoint = {
@@ -183,6 +186,9 @@ type ProgressContextValue = {
   fastingSessions: FastingSession[];
   adaptivePlan: AdaptivePlan;
   planDate: Date;
+  training: TrainingState;
+  dispatchTraining: (action: TrainingAction) => void;
+  saveStatus: 'loading' | 'saving' | 'saved' | 'error';
   startFast: () => void;
   finishFast: () => void;
   cancelFast: () => void;
@@ -264,7 +270,7 @@ function calculateStreak(dates: string[], today = todayKey()) {
   return streak;
 }
 
-function normalizeProfile(profile: OnboardingProfile | null | undefined): OnboardingProfile {
+export function normalizeProfile(profile: OnboardingProfile | null | undefined): OnboardingProfile {
   if (!profile) return DEFAULT_PROFILE;
   const focusTrack = TRACKS.includes(profile.focusTrack) ? profile.focusTrack : DEFAULT_PROFILE.focusTrack;
   const savedPriorities = Array.isArray(profile.priorityTracks)
@@ -396,7 +402,8 @@ export function getCycleProgress(cycleStartedAt: string, date = new Date()) {
   const start = new Date(`${cycleStartedAt}T12:00:00`);
   const current = new Date(date);
   current.setHours(12, 0, 0, 0);
-  const elapsedDays = Math.max(0, Math.floor((current.getTime() - start.getTime()) / 86_400_000));
+  // Civil days, so daylight-saving changes cannot hold a chapter back by a day.
+  const elapsedDays = Math.max(0, Math.round((Date.UTC(current.getFullYear(), current.getMonth(), current.getDate()) - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / 86_400_000));
   const day = (elapsedDays % 42) + 1;
   const cycle = Math.floor(elapsedDays / 42) + 1;
   const chapterIndex = Math.floor((day - 1) / 7);
@@ -584,7 +591,7 @@ export function getFastingTargetHours(profile: OnboardingProfile | null) {
   return current.fastingPreference === 'experienced' ? 14 : 12;
 }
 
-export function getDailyQuests(profile: OnboardingProfile | null, date = new Date(), adaptive?: AdaptivePlan) {
+export function getDailyQuests(profile: OnboardingProfile | null, date = new Date(), adaptive?: AdaptivePlan): Quest[] {
   const current = normalizeProfile(profile);
   const adaptiveLead = adaptive && adaptive.observedDays >= 3 ? [adaptive.weakestTrack] : [];
   const orderedTracks = Array.from(new Set([...adaptiveLead, ...current.priorityTracks, ...TRACKS])) as TrackKey[];
@@ -701,6 +708,38 @@ export function advanceProgressDay(current: ProgressState, date = new Date()): P
   };
 }
 
+export function applyTrainingAction(current: ProgressState, action: TrainingAction): ProgressState {
+  if (action.type !== 'start' && action.type !== 'discard') {
+    const challenge = current.training.sessions[action.key]?.challenge;
+    if (challenge?.quest.track === 'body' && challenge.movementLimit !== normalizeProfile(current.profile).movementLimit) return current;
+  }
+  const training = reduceTraining(current.training, action);
+  if (training === current.training) return current;
+  if (action.type !== 'finish' || training.results.length === current.training.results.length) return { ...current, training };
+  const now = new Date(action.now);
+  const next = advanceProgressDay(current, now);
+  const result = training.results[training.results.length - 1];
+  const date = localDateKey(now);
+  // Results and XP commit in one persisted state update. Legacy completions cannot pay twice.
+  if (next.completedToday.includes(result.questId)) return { ...next, training: { ...training, results: training.results.map((r) => r.sessionKey === result.sessionKey ? { ...r, xp: 0 } : r) } };
+  const completedToday = [...next.completedToday, result.questId];
+  const allPaths = TRACKS.every((track) => completedToday.some((id) => id.startsWith(TRACK_PREFIXES[track]) && !id.includes('-trait-')));
+  const bonus = allPaths && !next.dailyRewardDates.includes(date) ? 50 : 0;
+  const award = result.xp + bonus;
+  const previousXp = Object.values(next.xpByTrack).reduce((sum, xp) => sum + xp, 0);
+  const newLevel = Math.floor((previousXp + award) / 250) + 1;
+  return {
+    ...next, training, completedToday, totalCompleted: next.totalCompleted + 1,
+    xpByTrack: { ...next.xpByTrack, [result.track]: next.xpByTrack[result.track] + award },
+    xpByTrait: result.trait ? { ...next.xpByTrait, [result.trait]: next.xpByTrait[result.trait] + result.xp } : next.xpByTrait,
+    dailyXp: { ...next.dailyXp, [date]: (next.dailyXp[date] ?? 0) + award },
+    dailyRewardDates: bonus ? [...next.dailyRewardDates, date].slice(-45) : next.dailyRewardDates,
+    completedDates: next.completedDates.includes(date) ? next.completedDates : [...next.completedDates, date],
+    completionHistory: [...next.completionHistory, { questId: result.questId, date, completedAt: action.now, track: result.track, trait: result.trait, xp: result.xp }],
+    lastLevelUp: newLevel > Math.floor(previousXp / 250) + 1 ? newLevel : next.lastLevelUp,
+  };
+}
+
 export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<ProgressState>({
     completedToday: [],
@@ -719,13 +758,17 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     completionHistory: [],
     observedDates: [],
     dailyRewardDates: [],
+    training: emptyTraining(),
   });
   const [hydrated, setHydrated] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'loading' | 'saving' | 'saved' | 'error'>('loading');
+  const storageLoaded = useRef(false);
+  const writes = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {
-        if (!stored) return;
+        if (!stored) { storageLoaded.current = true; return; }
         const parsed = JSON.parse(stored) as StoredState;
         const today = todayKey();
         const legacyCompleted = Array.isArray(parsed.completed) ? parsed.completed : [];
@@ -753,9 +796,11 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
           completionHistory,
           observedDates,
           dailyRewardDates: parsed.dailyRewardDates ?? [],
+          training: parsed.training?.version === 1 && parsed.training.sessions && Array.isArray(parsed.training.results) ? parsed.training : emptyTraining(),
         });
+        storageLoaded.current = true;
       })
-      .catch(() => undefined)
+      .catch(() => setSaveStatus('error'))
       .finally(() => setHydrated(true));
   }, []);
 
@@ -769,7 +814,13 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   }, [hydrated]);
 
   useEffect(() => {
-    if (hydrated) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => undefined);
+    if (!hydrated || !storageLoaded.current) return;
+    let latest = true;
+    setSaveStatus('saving');
+    // Serialize writes so a slower old snapshot cannot overwrite a newer result.
+    writes.current = writes.current.catch(() => undefined).then(() => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)));
+    void writes.current.then(() => { if (latest) setSaveStatus('saved'); }, () => { if (latest) setSaveStatus('error'); });
+    return () => { latest = false; };
   }, [hydrated, state]);
 
   const value = useMemo<ProgressContextValue>(() => {
@@ -848,6 +899,8 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
         ...(Object.values(state.xpByTrait).some((xp) => xp > 0) ? ['Cross-trained'] : []),
         ...(Object.values(state.xpByTrait).every((xp) => xp > 0) ? ['Rounded apprentice'] : []),
         ...(adaptivePlan.observedDays >= 3 ? ['Plan learned your rhythm'] : []),
+        ...(state.training.results.some((result) => result.category === 'boss') ? ['First chapter challenge'] : []),
+        ...(state.training.results.some((result) => result.sessionKey.includes(':final:')) ? ['Evolution retested'] : []),
         ...(totalXp >= 500 ? ['Becoming consistent'] : []),
       ],
       lastLevelUp: state.lastLevelUp,
@@ -861,6 +914,9 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       fastingSessions: state.fastingSessions,
       adaptivePlan,
       planDate,
+      training: state.training,
+      dispatchTraining: (action) => setState((current) => applyTrainingAction(current, action)),
+      saveStatus,
       startFast: () => setState((current) => {
         const profile = normalizeProfile(current.profile);
         if (current.fastingStartedAt || profile.fastingPreference === 'off' || profile.fastingSafety !== 'clear') return current;
@@ -882,7 +938,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       }),
       cancelFast: () => setState((current) => ({ ...current, fastingStartedAt: null })),
     };
-  }, [hydrated, state]);
+  }, [hydrated, state, saveStatus]);
 
   return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>;
 }

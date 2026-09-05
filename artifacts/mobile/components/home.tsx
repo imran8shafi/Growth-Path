@@ -6,7 +6,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInLeft, FadeInRight, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { AdaptiveInsight } from '@/components/adaptive-insight';
 import { DailyRing } from '@/components/progress-visuals';
+import { TrainingHighlights } from '@/components/training-hub';
 import { ScreenShell, TaskRow, TRACKS, type TrackConfig } from '@/components/path-ui';
+import { trainingDailyTasks } from '@/lib/training-catalog';
 import { nativeTheme } from '@/lib/native-theme';
 import { ARCHETYPE_META, getCycleProgress, getDailyQuests, getEvolutionIdentity, type TrackKey, useProgress } from '@/context/progress';
 
@@ -30,11 +32,11 @@ function PathCard({ track, completed, index, onPress }: { track: TrackConfig; co
 export function HomeScreen() {
   const router = useRouter();
   const { profile, totalXp, level, levelProgress, currentStreak, isComplete, trackCompleted, cycleStartedAt, adaptivePlan, planDate } = useProgress();
-  const homeTasks = getDailyQuests(profile, planDate, adaptivePlan);
+  const homeTasks = trainingDailyTasks(profile, planDate, adaptivePlan, cycleStartedAt);
   const doneToday = homeTasks.filter((task) => isComplete(task.id)).length;
   const allComplete = doneToday === homeTasks.length;
   const focus = adaptivePlan.mode === 'foundation' ? profile?.focusTrack ?? 'mind' : adaptivePlan.weakestTrack;
-  const cycle = getCycleProgress(cycleStartedAt);
+  const cycle = getCycleProgress(cycleStartedAt, planDate);
   const identity = getEvolutionIdentity(profile);
   const archetype = ARCHETYPE_META[profile?.archetype ?? 'sovereign'];
 
@@ -42,7 +44,7 @@ export function HomeScreen() {
     <ScreenShell>
       <View style={styles.pagePadding}>
         <View style={styles.topBar}>
-          <Animated.View entering={FadeInLeft.duration(500)}><Text style={styles.eyebrow}>GROWTH PATH</Text><Text style={styles.greeting}>Your path, today.</Text></Animated.View>
+          <Animated.View entering={FadeInLeft.duration(500)}><Text style={styles.eyebrow}>JACK OF ALL</Text><Text style={styles.greeting}>Day {cycle.day}. {cycle.chapter.title}.</Text></Animated.View>
           <Animated.View entering={FadeInRight.duration(500)} style={styles.levelMark}><Text style={styles.levelNumber}>LV {level}</Text><Text style={styles.levelXp}>{totalXp} XP</Text></Animated.View>
         </View>
 
@@ -72,8 +74,9 @@ export function HomeScreen() {
         </View>
 
         <AdaptiveInsight />
-        <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>Today’s ritual</Text><Text style={styles.sectionSubtext}>Four paths + personalized human skill practice</Text></View><Text style={styles.sectionMeta}>{doneToday}/{homeTasks.length} COMPLETE</Text></View>
+        <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>Enter the training ground</Text><Text style={styles.sectionSubtext}>Primary path first · Start a session to train</Text></View><Text style={styles.sectionMeta}>{doneToday}/{homeTasks.length} COMPLETE</Text></View>
         <View style={styles.taskList}>{homeTasks.map((task, index) => <TaskRow key={task.id} {...task} trackColor={task.trackColor} index={index} />)}</View>
+        <TrainingHighlights compact />
 
         <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>The four paths</Text><Text style={styles.sectionMeta}>EXPLORE</Text></View>
         <View style={styles.pathGrid}>{(Object.keys(TRACKS) as TrackKey[]).map((key, index) => <PathCard key={key} track={TRACKS[key]} completed={trackCompleted(key)} index={index} onPress={() => router.push(`/${key}`)} />)}</View>

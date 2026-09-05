@@ -23,6 +23,7 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerBackTitle: 'Back' }}>
       <Stack.Protected guard={Boolean(profile)}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="session" options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack.Protected>
       <Stack.Protected guard={!profile}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
