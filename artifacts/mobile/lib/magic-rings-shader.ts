@@ -59,6 +59,8 @@ void main() {
   vec3 emissiveColor = intensity > 0.0001 ? clamp(c / intensity, 0.0, 1.0) : vec3(0.0);
   vec3 outputColor = mix(emissiveColor, clamp(c, 0.0, 1.0), uCoverageAlpha);
   float outputAlpha = mix(intensity, coverage, uCoverageAlpha);
-  gl_FragColor = vec4(outputColor, clamp(outputAlpha * uOpacity, 0.0, 1.0));
+  // Both browser and native view compositors expect premultiplied alpha.
+  float alpha = clamp(outputAlpha * uOpacity, 0.0, 1.0);
+  gl_FragColor = vec4(outputColor * alpha, alpha);
 }
 `;

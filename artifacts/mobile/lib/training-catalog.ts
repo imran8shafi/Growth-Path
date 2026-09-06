@@ -1,5 +1,6 @@
-import { getCycleProgress, getDailyQuests, getTodayTasks, normalizeProfile, type AdaptivePlan, type OnboardingProfile, type Quest, type TrackKey } from '@/context/progress';
+import { getCycleProgress, getDailyQuests, getTodayTasks, getTrackTasks, normalizeProfile, type AdaptivePlan, type OnboardingProfile, type Quest, type TrackKey } from '@/context/progress';
 import { dateKey, seededIndex, trainingLevel, type Challenge, type Mechanic, type SkillKey, type Stage, type TrainingState } from './training-model';
+import { trainingLesson } from './training-lessons';
 
 const DEPTH: Record<SkillKey, string[]> = {
   focus: ['Name the distraction most likely to interrupt you and your response.', 'Describe how you returned after an interruption, or how you would.', 'Explain your output from memory and give a different application.', 'Design a repeatable work ritual, including a clear stopping point.'],
@@ -43,7 +44,8 @@ function recipeFor(quest: Quest, profile: OnboardingProfile | null, level: numbe
   const choose = <T,>(items: T[]): T => items[seededIndex(seed, items.length)];
   const creation = (title: string, summary: string, skill: SkillKey, prompt: string, items: string[]): Recipe => ({ title, summary, skill, mechanic: 'creation', stages: [write('create', title, prompt), rubric(items)] });
   const mission = (title: string, summary: string, skill: SkillKey, prompt: string): Recipe => ({ title, summary, skill, mechanic: 'field', stages: field(prompt) });
-  const composure: Recipe = { title: 'Composure reset', summary: 'Rate your state, follow a gentle visual interval, then compare your own ratings.', skill: 'composure', mechanic: 'timer', stages: [rating('before', 'Before the reset'), timer('reset', 'Find a comfortable tempo', 'Let the rings be a soft visual cue. Breathe normally or use a comfortable rhythm. No holds or forced deep breaths; stop if light-headed. You can simply observe the animation.', 60, 'composure'), rating('after', 'After the reset'), write('notice', 'What did you notice?', 'Name one change, or say that nothing changed. Either is useful.', 3)] };
+  const attention = (id: string): Stage => ({ id, type: 'attention', title: 'Follow the signal', prompt: 'For each symbol, choose Target for a circle and Pass for anything else. Accuracy is recorded; speed is not scored.', target: '●', cues: (id.includes('before') ? ['●', '◆', '■', '●', '▲', '●', '■', '◆', '●', '▲', '●', '◆'] : ['◆', '●', '▲', '■', '●', '◆', '●', '▲', '●', '■', '◆', '●']) });
+  const composure: Recipe = { title: 'Composure test', summary: 'Check your state and attention, take a 90-second reset, then repeat the check.', skill: 'composure', mechanic: 'timer', stages: [rating('before', 'Before the reset'), attention('attention-before'), timer('reset', 'Find a comfortable tempo', 'Let the orb be a soft visual cue. Breathe normally or use a comfortable rhythm. No holds or forced deep breaths; stop if light-headed. You can simply observe the animation.', 90, 'composure'), rating('after', 'After the reset'), attention('attention-after'), write('notice', 'What did you notice?', 'Name one change, or say that nothing changed. Either is useful.', 3)] };
   const memory: Recipe = { title: 'Recall trial', summary: 'Study a short set, retrieve it without looking, and see exactly what you recalled.', skill: 'memory', mechanic: 'skill', stages: [
     { id: 'recall', title: 'Observe, then retrieve', prompt: 'Study these words. When they disappear, enter the ones you remember in any order.', type: 'recall', seconds: 15, words: choose([
       ['river', 'candle', 'train', 'lemon', 'mirror', 'cloud', 'pencil', 'garden'], ['island', 'window', 'horse', 'silver', 'basket', 'bridge', 'planet', 'feather'], ['forest', 'button', 'tiger', 'orange', 'ladder', 'ocean', 'pillow', 'castle'], ['mountain', 'camera', 'apple', 'velvet', 'anchor', 'sunset', 'ribbon', 'village'],
@@ -69,7 +71,7 @@ function recipeFor(quest: Quest, profile: OnboardingProfile | null, level: numbe
       { label: 'State my boundary with respect', response: 'This protects clarity. Consider tone and context so the other person can understand your boundary.' },
       { label: 'Ask questions before deciding', response: 'Curiosity may reveal a workable option. Set a point at which you will make your decision.' },
       { label: 'Speak privately or propose an alternative', response: 'A private conversation can reduce defensiveness. Make sure the alternative still honors your principle.' },
-    ]), write('principle', 'Name the principle', 'Which value guided you, and what cost or tradeoff are you willing to accept? There is no universal score for your beliefs.'),
+    ]), { id: 'guiding-values', type: 'values', title: 'What mattered to you?', prompt: 'Choose up to two values behind your response. These build your personal values map; there is no right answer.', maximum: 2, options: ['Honesty', 'Care', 'Fairness', 'Loyalty', 'Courage', 'Autonomy', 'Responsibility', 'Curiosity'] }, write('principle', 'Name the principle', 'Which value guided you, and what cost or tradeoff are you willing to accept? There is no universal score for your beliefs.'),
   ] };
   const negotiation: Recipe = { title: 'Negotiation lab', summary: 'Practice finding interests before debating a position.', skill: 'negotiation', mechanic: 'skill', stages: [
     decision('negotiate', 'Ask before arguing', 'A collaborator says your proposed deadline is impossible. A useful first step is to understand the constraint. What do you say?', [
@@ -80,8 +82,8 @@ function recipeFor(quest: Quest, profile: OnboardingProfile | null, level: numbe
   ] };
   const story: Recipe = { title: 'Storycraft', summary: 'Build a hook, speak a short story, then review its structure.', skill: 'storytelling', mechanic: 'creation', stages: [
     write('hook', level >= 3 ? 'Lead with the unexpected' : 'Set the scene', choose(['A small mistake that taught you something.', 'A moment when your plan changed unexpectedly.', 'A time you misunderstood something funny.', 'An ordinary trip with one surprising detail.'])),
-    timer('prepare', 'Find your turn', 'Choose one specific detail and the moment that changes the story.', 20, 'prepare'),
-    timer('speak', 'Tell it in one minute', 'Speak aloud. This session does not record audio. You can write your version in the next step instead.', 60, 'speak'),
+    timer('prepare', 'Find your turn', 'Choose one specific detail and the moment that changes the story.', 30, 'prepare'),
+    timer('speak', 'Tell it in one minute', 'Record an optional take to replay and review, or practice aloud using the timer. You can write your version in the next step.', 60, 'speak'),
     write('payoff', 'Save your ending', 'Write the payoff, or your short version of the story.'), rubric(['A clear setup', 'A specific detail', 'A turn or payoff']),
   ] };
   if (quest.trait) {
@@ -152,10 +154,11 @@ export function questChallenge(quest: Quest, profile: OnboardingProfile | null, 
   const first = recipeFor(quest, profile, 1, date);
   const level = trainingLevel(first.skill, profile, training.results, dateKey(date));
   const recipe = recipeFor(quest, profile, level, date);
+  if (recipe.mechanic === 'skill') recipe.stages = [trainingLesson(recipe.skill), ...recipe.stages];
   if (level > 1) recipe.stages = [...recipe.stages, write('depth', `Level ${level}: apply the skill`, DEPTH[recipe.skill][level - 2])];
-  const measured = recipe.stages.some((s) => s.type === 'recall' || s.type === 'performance' || s.type === 'ideas');
+  const measured = recipe.stages.some((s) => s.type === 'recall' || s.type === 'performance' || s.type === 'ideas' || s.type === 'attention');
   const category = recipe.mechanic === 'field' ? 'mission' : measured ? 'trial' : 'quest';
-  const minutes = Math.max(2, Math.ceil(recipe.stages.reduce((sum, s) => sum + ('seconds' in s ? s.seconds : s.type === 'choice' ? 20 : 30), 0) / 60));
+  const minutes = Math.max(2, Math.ceil(recipe.stages.reduce((sum, s) => sum + ('seconds' in s ? (s.seconds ?? 0) : s.type === 'choice' ? 20 : 30), 0) / 60));
   return { quest: { ...quest, title: recipe.title, detail: recipe.summary, meta: `${category.toUpperCase()} · ${minutes} MIN` }, mechanic: recipe.mechanic, category, skill: recipe.skill, level, stages: recipe.stages, minutes, scope: `day:${dateKey(date)}`, cycle: cycle.cycle, cycleDay: cycle.day, movementLimit: normalizeProfile(profile).movementLimit, reason: level > 1 ? `Level ${level} combines your starting preference with feedback from previous sessions.` : 'Start with a small, complete attempt. Your feedback calibrates future sessions.' };
 }
 
@@ -168,6 +171,19 @@ export function trainingTrackTasks(track: TrackKey, profile: OnboardingProfile |
 }
 export function trainingDailyTasks(profile: OnboardingProfile | null, date: Date, adaptive: AdaptivePlan, cycleStartedAt: string): Quest[] {
   return getDailyQuests(profile, date, adaptive).map((quest) => quest.kind === 'cross-training' ? quest : { ...trainingTrackTasks(quest.track, profile, date, adaptive, cycleStartedAt)[quest.kind === 'anchor' ? 1 : 0], kind: quest.kind });
+}
+
+// Uses the same quest IDs and session keys as daily training, so the library cannot pay duplicate XP.
+export function practiceChallenges(profile: OnboardingProfile | null, training: TrainingState, date: Date, cycleStartedAt: string): Challenge[] {
+  const ids = ['mind-focus', 'mind-reframe', 'mind-recall', 'body-strength', 'body-mobility', 'body-breathe', 'soul-values', 'soul-serve', 'freedom-learn', 'freedom-build', 'freedom-system'];
+  const quests = (['mind', 'body', 'soul', 'freedom'] as TrackKey[]).flatMap((track) => getTrackTasks(track, profile)).filter((q) => ids.includes(q.id));
+  const extras: Quest[] = [
+    { id: 'mind-trait-wit-story', trait: 'wit', title: '', detail: '', track: 'mind', trackColor: '#55D6FF', trackIcon: 'mic', xp: 35, meta: '' },
+    { id: 'mind-trait-wit-lab', trait: 'wit', title: '', detail: '', track: 'mind', trackColor: '#F59ED7', trackIcon: 'smile', xp: 30, meta: '' },
+    { id: 'mind-trait-creativity-lab', trait: 'creativity', title: '', detail: '', track: 'mind', trackColor: '#8D7CFF', trackIcon: 'aperture', xp: 35, meta: '' },
+    { id: 'mind-trait-adaptability-lab', trait: 'adaptability', title: '', detail: '', track: 'mind', trackColor: '#55D6FF', trackIcon: 'shuffle', xp: 35, meta: '' },
+  ];
+  return [...quests, ...extras].map((quest) => questChallenge(quest, profile, training, date, cycleStartedAt));
 }
 
 export function specialChallenges(profile: OnboardingProfile | null, training: TrainingState, date: Date, cycleStartedAt: string): Challenge[] {
@@ -190,7 +206,7 @@ export function specialChallenges(profile: OnboardingProfile | null, training: T
   const boss: Challenge = {
     quest: baseQuest(`${week.track}-boss-${cycle.chapterIndex + 1}`, week.track, week.title, week.brief, 150),
     mechanic: 'boss', category: 'boss', skill: week.skill, secondarySkills: ['reasoning', 'connection'], level: trainingLevel(week.skill, profile, training.results, dateKey(date)),
-    stages: [decision('lesson', 'Learn → choose', `${week.lesson} What is the strongest next step?`, [
+    stages: [trainingLesson(week.skill), decision('lesson', 'Learn → choose', `${week.lesson} What is the strongest next step?`, [
       { label: 'Understand the situation and define a useful outcome', response: 'A specific outcome gives you something to test in the real world.', correct: true },
       { label: 'Push ahead without asking questions', response: 'Speed helps only if you are solving the right problem.', correct: false },
       { label: 'Wait until I can guarantee success', response: 'A low-stakes test can teach you something without a guarantee.', correct: false },

@@ -1,0 +1,62 @@
+import React, { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter, type Href } from 'expo-router';
+import { useProgress } from '@/context/progress';
+import { guidedPlan } from '@/lib/guided-programmes';
+import { sessionKey, type Challenge } from '@/lib/training-model';
+import { ScreenShell, TRACKS } from './path-ui';
+import { AnimatedWords, StarBorder } from './motion-bits';
+import { LevelJourney } from './level-journey';
+
+export function ProgrammeHome() {
+  const [open, setOpen] = useState(false); const router = useRouter();
+  const { profile, training, planDate, dispatchTraining, level, saveStatus, currentStreak } = useProgress();
+  const plan = guidedPlan(profile, training, planDate);
+  const done = (c: Challenge) => training.results.some(r => r.sessionKey === sessionKey(c));
+  const complete = plan.filter(done).length;
+  const start = (c: Challenge) => { if (done(c)) return; dispatchTraining({ type: 'start', challenge: c, now: new Date().toISOString() }); setOpen(false); router.push(`/session?session=${encodeURIComponent(sessionKey(c))}` as Href); };
+  return <ScreenShell><View style={s.page}>
+    <View style={s.row}><Text style={s.small}>{planDate.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</Text><Text style={s.accent}>LEVEL {level}</Text></View>
+    <AnimatedWords text="Today’s quests" style={s.heading} />
+    <Text style={s.body}>Read something worthwhile. Move your body. Build your financial future.</Text>
+    <StarBorder color="#55D6FF" style={{ marginTop: 22, borderRadius: 24 }}><LinearGradient colors={['#153449', '#161E35']} style={s.hero}>
+      <Text style={s.title}>{plan.length === 0 ? 'Foundation complete' : complete === plan.length ? 'Today’s quests complete' : 'A little stronger, every day.'}</Text>
+      <Text style={s.body}>{complete} / {plan.length} complete · about {plan.reduce((n,c) => n + c.minutes, 0)} min planned</Text>
+      <View style={s.track}><View style={{ height: '100%', backgroundColor: '#4CD6B0', width: `${plan.length ? complete / plan.length * 100 : 100}%` }} /></View>
+      <Pressable accessibilityRole="button" onPress={() => setOpen(true)} style={s.primary}><Text style={s.primaryText}>{complete === plan.length ? 'View today’s quests' : 'Unlock today’s quests'}</Text><Feather name="arrow-right" size={20} color="#07131F" /></Pressable>
+    </LinearGradient></StarBorder>
+    <LevelJourney />
+    {saveStatus === 'error' ? <Text accessibilityRole="alert" style={s.body}>Storage is unavailable. Keep the app open until your progress saves.</Text> : null}
+    <View style={[s.hero, { marginTop: 24 }]}><Text style={s.accent}>YOUR MOMENTUM</Text><Text style={s.title}>{currentStreak} day{currentStreak === 1 ? '' : 's'} of showing up</Text><Text style={s.body}>Unfinished quests stay saved. Pick up where you left off without a backlog.</Text><Pressable accessibilityRole="button" onPress={() => router.push('/progress' as Href)} style={s.link}><Text style={s.accent}>See my progress →</Text></Pressable></View>
+    <Pressable accessibilityRole="button" onPress={() => router.push('/programme-settings' as Href)} style={s.link}><Text style={s.accent}>Adjust my programme</Text></Pressable>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+      <View style={s.overlay}><View accessibilityViewIsModal style={s.sheet}>
+        <View style={s.row}><Text accessibilityRole="header" style={s.title}>Today’s quests</Text><Pressable accessibilityRole="button" accessibilityLabel="Close quests" onPress={() => setOpen(false)} style={s.close}><Feather name="x" size={24} color="#EAF5FC" /></Pressable></View>
+        <Text style={s.body}>Pick a quest and get started.</Text>
+        <ScrollView>{plan.map(c => <Pressable key={sessionKey(c)} accessibilityRole="button" disabled={done(c)} accessibilityState={{ disabled: done(c) }} onPress={() => start(c)} style={[s.quest, { borderColor: '#365365' }]}>
+          <Text style={s.questTitle}>{c.quest.title}</Text><Text style={s.body}>{c.programme?.outcome}</Text>
+          <View style={[s.row, { marginTop: 14 }]}><Text style={s.small}>About {c.minutes} min</Text><Text style={s.accent}>{done(c) ? 'Completed ✓' : training.sessions[sessionKey(c)] ? 'Continue →' : 'Take quest →'}</Text></View>
+        </Pressable>)}</ScrollView>
+      </View></View>
+    </Modal>
+  </View></ScreenShell>;
+}
+const s = StyleSheet.create({
+  page: { paddingHorizontal: 22, paddingTop: 12, maxWidth: 680, width: '100%', alignSelf: 'center' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
+  heading: { color: '#F6FBFF', fontSize: 36, fontWeight: '700', marginTop: 28 },
+  title: { color: '#F6FBFF', fontSize: 23, lineHeight: 30, fontWeight: '700', marginTop: 14, flexShrink: 1 },
+  body: { color: '#AAC0CF', fontSize: 14, lineHeight: 22, marginTop: 10 },
+  small: { color: '#AAC0CF', fontSize: 12, lineHeight: 18 }, accent: { color: '#79DBEE', fontSize: 12, fontWeight: '700' },
+  hero: { padding: 22, borderRadius: 23, backgroundColor: '#102334' },
+  track: { height: 5, borderRadius: 5, backgroundColor: '#2D4053', overflow: 'hidden', marginTop: 18 },
+  primary: { backgroundColor: '#65D9EE', minHeight: 56, borderRadius: 16, paddingHorizontal: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22 },
+  primaryText: { fontSize: 16, fontWeight: '700', color: '#07131F' }, link: { minHeight: 54, justifyContent: 'center' },
+  overlay: { flex: 1, backgroundColor: '#000A', justifyContent: 'flex-end', alignItems: 'center' },
+  sheet: { maxHeight: '90%', backgroundColor: '#0C1A2A', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingBottom: 36, maxWidth: 680, width: '100%' },
+  close: { width: 48, height: 48, justifyContent: 'center', alignItems: 'center' },
+  quest: { borderWidth: 1, borderRadius: 18, backgroundColor: '#142638', padding: 18, marginTop: 16 },
+  questTitle: { color: '#F6FBFF', fontSize: 19, fontWeight: '600', marginTop: 12 },
+});

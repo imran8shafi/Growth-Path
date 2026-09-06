@@ -28,7 +28,8 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      ["expo-audio", { "microphonePermission": "Allow Jack of All to record your Storycraft practice when you tap Record." }]
     ],
     "experiments": {
       "typedRoutes": true,

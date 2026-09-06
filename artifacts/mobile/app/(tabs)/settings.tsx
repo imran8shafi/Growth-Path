@@ -49,11 +49,11 @@ export default function SettingsRoute() {
         <View style={styles.settingsCard}>
           <SettingRow index={3} icon="hexagon" color={archetype.color} title="Evolution cycle" detail={`${archetype.label} · 42 days · six chapters`} onPress={() => router.push('/evolve' as Href)} />
           <SettingRow index={4} icon="message-circle" color="#8D7CFF" title="Coaching voice" detail={`${coachingLabel} guidance`} />
-          <SettingRow index={5} icon="clock" color="#FFCC66" title="Fasting protocol" detail={fastingLabel} onPress={() => router.push('/evolve' as Href)} />
+          <SettingRow index={5} icon="map" color="#A998FF" title="My guided programme" detail="Main goal, daily time, business route, and meal preferences" onPress={() => router.push('/programme-settings' as Href)} />
           <SettingRow index={6} icon="refresh-cw" color="#4CD6B0" title="Retake your starting point" detail="Update your goals, capacity, and focus" onPress={() => { resetOnboarding(); router.replace('/onboarding'); }} />
           <SettingRow index={7} icon="sliders" color="#4CD6B0" title="Learning from your practice" detail="Previous app days shape pace, variety, and focus. See Progress for the reasons." onPress={() => router.push('/progress')} />
           <SettingRow index={7} icon="shield" color="#55D6FF" title="Local-first progress" detail="Your answers, practice history, and XP stay on this device" />
-          <SettingRow index={8} icon="info" color="#91A7B8" title="About Growth Path" detail="Mind · Body · Soul · Freedom · Human range" />
+          <SettingRow index={8} icon="info" color="#91A7B8" title="About Growth Path" detail="Mind · Body · Financial Freedom" />
         </View>
 
         <Animated.View entering={FadeInDown.delay(420).duration(500)} style={styles.manifesto}>

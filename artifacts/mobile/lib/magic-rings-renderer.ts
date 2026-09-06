@@ -1,7 +1,8 @@
 import { fragmentShader } from './magic-rings-shader';
+import { energyOrbShader } from './energy-orb-shader';
 
 // A small GL host for the upstream shader; Expo GL and browser WebGL expose these APIs.
-export function createRingRenderer(gl: WebGLRenderingContext, endFrame: () => void = () => {}) {
+export function createRingRenderer(gl: WebGLRenderingContext, endFrame: () => void = () => {}, variant: 'rings' | 'orb' = 'rings') {
   const shaders: WebGLShader[] = [];
   const compile = (type: number, source: string) => {
     const shader = gl.createShader(type);
@@ -16,7 +17,7 @@ export function createRingRenderer(gl: WebGLRenderingContext, endFrame: () => vo
   try {
     if (!program) throw new Error('GL program unavailable');
     gl.attachShader(program, compile(gl.VERTEX_SHADER, 'attribute vec2 position; void main() { gl_Position = vec4(position, 0.0, 1.0); }'));
-    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentShader)); gl.linkProgram(program);
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, variant === 'orb' ? energyOrbShader : fragmentShader)); gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Ring program could not link');
     gl.useProgram(program);
     buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buffer);

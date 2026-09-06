@@ -44,7 +44,7 @@ const BASE_QUESTIONS: Question[] = [
   {
     key: 'archetype', pillar: 'YOUR NEXT FORM',
     title: 'Who are you becoming?',
-    subtitle: 'Choose the identity that should guide your 42-day evolution cycle.',
+    subtitle: 'Choose the identity that should guide your first seven days.',
     options: [
       { value: 'guardian', label: 'The Guardian', detail: 'Capable, courageous, and responsible.', icon: 'shield' },
       { value: 'scholar', label: 'The Scholar', detail: 'Focused, thoughtful, and hard to mislead.', icon: 'book-open' },
@@ -56,12 +56,11 @@ const BASE_QUESTIONS: Question[] = [
   {
     key: 'priorityTracks', pillar: 'YOUR PRIORITIES', mode: 'ranked',
     title: 'Which two paths need you most?',
-    subtitle: 'Choose your first priority, then your second. All four paths remain part of your plan.',
+    subtitle: 'Choose your first priority, then your second. All three paths remain part of your plan.',
     options: [
       { value: 'mind', label: 'Mind', detail: 'Focus, learning, and clear thinking.', icon: 'book-open' },
       { value: 'body', label: 'Body', detail: 'Energy, strength, and recovery.', icon: 'activity' },
-      { value: 'soul', label: 'Soul', detail: 'Meaning, stillness, and connection.', icon: 'sun' },
-      { value: 'freedom', label: 'Freedom', detail: 'Skills, systems, and autonomy.', icon: 'compass' },
+      { value: 'freedom', label: 'Financial Freedom', detail: 'Skills, systems, and autonomy.', icon: 'compass' },
     ],
   },
   {
@@ -140,29 +139,8 @@ const BASE_QUESTIONS: Question[] = [
     ],
   },
   {
-    key: 'beliefs', pillar: 'SOUL',
-    title: 'How should the Soul path speak to you?',
-    subtitle: 'Your inner path should respect your actual beliefs.',
-    options: [
-      { value: 'faith', label: 'Faith or prayer', detail: 'A tradition or devotion guides me.', icon: 'sunrise' },
-      { value: 'reflection', label: 'Quiet reflection', detail: 'Stillness helps me return to myself.', icon: 'moon' },
-      { value: 'service', label: 'People and service', detail: 'I find meaning in showing up for others.', icon: 'users' },
-      { value: 'open', label: 'I am still exploring', detail: 'Keep it open, practical, and honest.', icon: 'compass' },
-    ],
-  },
-  {
-    key: 'freedomFocus', pillar: 'FREEDOM',
-    title: 'What kind of freedom matters most now?',
-    subtitle: 'This determines whether your quests build financial room, mobility, or both.',
-    options: [
-      { value: 'financial', label: 'Financial freedom', detail: 'Earn more, save better, and reduce dependence.', icon: 'dollar-sign' },
-      { value: 'mobility', label: 'Time and travel freedom', detail: 'Create work and systems that can move with me.', icon: 'map' },
-      { value: 'both', label: 'Both', detail: 'Build money and mobility together.', icon: 'navigation' },
-    ],
-  },
-  {
     key: 'freedomStage', pillar: 'YOUR STARTING POINT',
-    title: 'Where should your Freedom path begin?',
+    title: 'Where should your Financial Freedom path begin?',
     subtitle: 'Choose the problem that is most real today—not the final destination.',
     options: [
       { value: 'control', label: 'Control my spending', detail: 'Understand where my money goes.', icon: 'pie-chart' },
@@ -216,20 +194,6 @@ const BASE_QUESTIONS: Question[] = [
   },
 ];
 
-const FAITH_QUESTION: Question = {
-  key: 'faithTradition', pillar: 'YOUR TRADITION',
-  title: 'Which tradition should we respect?',
-  subtitle: 'This is only used to keep readings and reflections relevant. You can keep it private.',
-  options: [
-    { value: 'islam', label: 'Islam', detail: 'Use Islamic language and relevant scripture journeys.', icon: 'moon' },
-    { value: 'christianity', label: 'Christianity', detail: 'Use Christian language and relevant scripture journeys.', icon: 'book-open' },
-    { value: 'hinduism', label: 'Hinduism', detail: 'Use Hindu language and relevant scripture journeys.', icon: 'sun' },
-    { value: 'buddhism', label: 'Buddhism', detail: 'Use Buddhist language and relevant scripture journeys.', icon: 'circle' },
-    { value: 'other', label: 'Another tradition', detail: 'Keep practices faith-aware without assuming details.', icon: 'compass' },
-    { value: 'private', label: 'Keep it private', detail: 'Use neutral faith language.', icon: 'lock' },
-  ],
-};
-
 const FASTING_SAFETY_QUESTION: Question = {
   key: 'fastingSafety', pillar: 'FASTING SAFETY',
   title: 'Which statement fits you?',
@@ -246,10 +210,6 @@ function getQuestions(answers: Partial<OnboardingProfile>) {
   if (answers.fastingPreference && answers.fastingPreference !== 'off') {
     const fastingIndex = questions.findIndex((question) => question.key === 'fastingPreference');
     questions.splice(fastingIndex + 1, 0, FASTING_SAFETY_QUESTION);
-  }
-  if (answers.beliefs === 'faith') {
-    const beliefIndex = questions.findIndex((question) => question.key === 'beliefs');
-    questions.splice(beliefIndex + 1, 0, FAITH_QUESTION);
   }
   return questions;
 }
@@ -311,7 +271,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
       <Animated.View entering={FadeInUp.delay(250).duration(650)} style={styles.introCopy}>
         <Text style={styles.brandKicker}>GROWTH PATH</Text>
         <Text style={styles.introTitle}>Become who your{`\n`}life is asking for.</Text>
-        <Text style={styles.introSubtitle}>A daily path for your mind, body, soul, and freedom.</Text>
+        <Text style={styles.introSubtitle}>A daily path for your mind, body, and financial freedom.</Text>
       </Animated.View>
       <Animated.View entering={FadeInUp.delay(650).duration(600)} style={styles.introFooter}>
         <PrimaryButton label="Build my path" onPress={onStart} icon="arrow-right" />
@@ -331,7 +291,7 @@ function ProgressHeader({ index, total, onBack }: { index: number; total: number
         <Feather name="arrow-left" size={21} color={C.text} />
       </Pressable>
       <View style={styles.progressTrack}><Animated.View style={[styles.progressFill, fill]} /></View>
-      <Text style={styles.progressCount}>{index + 1}/{total}</Text>
+
     </View>
   );
 }
@@ -391,10 +351,10 @@ function QuestionScreen({ question, index, total, selected, direction, onSelect,
 const ANALYSIS_STEPS = [
   { label: 'Reading your mind pattern', threshold: 12, icon: 'book-open' as IconName },
   { label: 'Mapping energy and recovery', threshold: 28, icon: 'activity' as IconName },
-  { label: 'Checking optional protocols', threshold: 44, icon: 'shield' as IconName },
-  { label: 'Finding your inner anchors', threshold: 60, icon: 'sun' as IconName },
+  { label: 'Checking your movement needs', threshold: 44, icon: 'shield' as IconName },
+  { label: 'Shaping your reading practice', threshold: 60, icon: 'sun' as IconName },
   { label: 'Choosing your cross-training', threshold: 77, icon: 'shuffle' as IconName },
-  { label: 'Building your 42-day cycle', threshold: 94, icon: 'compass' as IconName },
+  { label: 'Building your seven-day cycle', threshold: 94, icon: 'compass' as IconName },
 ];
 
 function AnalysisScreen({ onDone }: { onDone: () => void }) {
@@ -408,7 +368,7 @@ function AnalysisScreen({ onDone }: { onDone: () => void }) {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const timeout = setTimeout(onDone, 750); return () => clearTimeout(timeout);
   }, [onDone, percent]);
-  const status = percent < 30 ? 'Understanding your starting point' : percent < 62 ? 'Balancing the four paths' : percent < 92 ? 'Shaping your daily rhythm' : 'Your path is almost ready';
+  const status = percent < 30 ? 'Understanding your starting point' : percent < 62 ? 'Shaping your three paths' : percent < 92 ? 'Shaping your daily rhythm' : 'Your path is almost ready';
   return (
     <View style={styles.analysisScreen}>
       <Animated.View entering={FadeInDown.duration(500)}>
@@ -430,41 +390,13 @@ function AnalysisScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-type Scores = Record<TrackKey, { now: number; potential: number }>;
-function calculateScores(a: Partial<OnboardingProfile>): Scores {
-  const consistency = a.momentumObstacle === 'narrow' ? 18 : a.momentumObstacle === 'clarity' ? 3 : 8;
-  const time = a.time === 'forty' ? 14 : a.time === 'twenty' ? 9 : 5;
-  const raw = {
-    mind: 34 + consistency + (a.mindState === 'clear' ? 20 : a.mindState === 'stressed' ? 5 : 9),
-    body: 28 + time + (a.energyLevel === 'strong' ? 18 : a.energyLevel === 'uneven' ? 9 : 3) + (a.sleepQuality === 'good' ? 10 : a.sleepQuality === 'okay' ? 5 : 0),
-    soul: 37 + consistency + (a.beliefs === 'open' ? 4 : 13), freedom: 34 + time + (a.goal === 'autonomy' ? 18 : 8),
-  };
-  const score = (track: TrackKey) => Math.min(82, raw[track] + (a.priorityTracks?.[0] === track ? 4 : a.priorityTracks?.[1] === track ? 2 : 0));
-  const make = (track: TrackKey) => { const now = score(track); return { now, potential: Math.min(94, now + 27) }; };
-  return { mind: make('mind'), body: make('body'), soul: make('soul'), freedom: make('freedom') };
-}
-
 const SCORE_META: Record<TrackKey, { label: string; icon: IconName; color: string }> = {
   mind: { label: 'Mind', icon: 'book-open', color: C.cyan }, body: { label: 'Body', icon: 'activity', color: C.green },
-  soul: { label: 'Soul', icon: 'sun', color: C.gold }, freedom: { label: 'Freedom', icon: 'key', color: C.blue },
+  soul: { label: 'Soul', icon: 'sun', color: C.gold }, freedom: { label: 'Financial Freedom', icon: 'key', color: C.blue },
 };
 
-function ScoreRow({ track, score, index }: { track: TrackKey; score: { now: number; potential: number }; index: number }) {
-  const meta = SCORE_META[track]; const value = useSharedValue(0);
-  useEffect(() => { value.value = withDelay(260 + index * 120, withTiming(score.now / 100, { duration: 850 })); }, [index, score.now, value]);
-  const bar = useAnimatedStyle(() => ({ transform: [{ scaleX: value.value }] }));
-  return (
-    <Animated.View entering={FadeInDown.delay(120 + index * 90).duration(450)} style={styles.scoreCard}>
-      <View style={styles.scoreTopRow}><View style={[styles.scoreIcon, { backgroundColor: `${meta.color}20` }]}><Feather name={meta.icon} size={16} color={meta.color} /></View>
-        <Text style={styles.scoreLabel}>{meta.label}</Text><Text style={[styles.scoreValue, { color: meta.color }]}>{score.now}</Text></View>
-      <View style={styles.scoreTrack}><View style={[styles.potentialMarker, { left: `${score.potential}%`, borderColor: meta.color }]} /><Animated.View style={[styles.scoreFill, { backgroundColor: meta.color }, bar]} /></View>
-      <Text style={styles.potentialText}>42-day potential {score.potential}</Text>
-    </Animated.View>
-  );
-}
-
 function ResultScreen({ answers, onContinue }: { answers: Partial<OnboardingProfile>; onContinue: () => void }) {
-  const scores = useMemo(() => calculateScores(answers), [answers]); const focus = (answers.focusTrack ?? 'mind') as TrackKey;
+  const focus = (answers.focusTrack ?? 'mind') as TrackKey;
   const identity = getEvolutionIdentity(answers as OnboardingProfile);
   const archetype = ARCHETYPE_META[answers.archetype ?? 'sovereign'];
   return (
@@ -472,15 +404,14 @@ function ResultScreen({ answers, onContinue }: { answers: Partial<OnboardingProf
       <Animated.View entering={FadeInDown.duration(520)}>
         <View style={styles.completePill}><Feather name="check-circle" size={14} color={C.green} /><Text style={styles.completePillText}>PATH ANALYSIS COMPLETE</Text></View>
         <Text style={styles.resultTitle}>You do not need a new life.{`\n`}You need a clear next step.</Text>
-        <Text style={styles.resultSubtitle}>This is a starting snapshot, not a score of your worth. Your strongest growth opportunity begins with {SCORE_META[focus].label.toLowerCase()}.</Text>
+        <Text style={styles.resultSubtitle}>Your first seven days combine reading, movement and a practical business project. Your main focus is {SCORE_META[focus].label.toLowerCase()}.</Text>
       </Animated.View>
       <Animated.View entering={FadeInDown.delay(90).duration(520)} style={[styles.identityReveal, { borderColor: `${archetype.color}55` }]}>
         <View style={styles.identitySide}><Text style={styles.identityLabel}>CURRENT FORM</Text><Text style={styles.identityCurrent}>{identity.current}</Text></View>
         <View style={[styles.identityArrow, { backgroundColor: `${archetype.color}20` }]}><Feather name="arrow-right" size={17} color={archetype.color} /></View>
         <View style={[styles.identitySide, styles.identityNext]}><Text style={[styles.identityLabel, { color: archetype.color }]}>NEXT FORM</Text><Text style={styles.identityNextText}>{identity.next}</Text></View>
       </Animated.View>
-      <View style={styles.scoreList}>{(Object.keys(scores) as TrackKey[]).map((track, index) => <ScoreRow key={track} track={track} score={scores[track]} index={index} />)}</View>
-      <View style={styles.resultLegend}><View style={styles.legendDot} /><Text style={styles.resultLegendText}>Marker = what your first 42-day cycle can begin to unlock</Text></View>
+      <View style={styles.scoreList}>{[{ title: "Mind · From scattered input to a reading practice", detail: "Seven short reading sessions, with ideas about attention, judgment and responsibility to use in daily life." }, { title: "Body · From uncertainty to a repeatable routine", detail: "Two suitable movement sessions, a balanced meal template and a grocery plan. Adapt movements to your starting point." }, { title: "Financial Freedom · From an idea to useful evidence", detail: "A customer brief, a sample or prototype, and a small offer or build plan. These are milestones, not a promise of income." }].map(item => <View key={item.title} style={styles.scoreCard}><Text style={[styles.scoreLabel, { fontSize: 17 }]}>{item.title}</Text><Text style={[styles.resultSubtitle, { fontSize: 14 }]}>{item.detail}</Text></View>)}</View><Text style={styles.resultLegendText}>Your seven-day potential: concrete things you can build through practice. Your pace and results can vary; missed days simply carry forward.</Text>
       <PrimaryButton label="See my first commitment" onPress={onContinue} icon="arrow-right" />
     </ScrollView>
   );
@@ -493,21 +424,21 @@ function CommitmentScreen({ answers, onUnlock }: { answers: Partial<OnboardingPr
   return (
     <View style={styles.commitScreen}>
       <Animated.View entering={FadeInDown.duration(520)} style={styles.commitCopy}>
-        <Text style={styles.commitKicker}>YOUR 42-DAY CYCLE</Text><Text style={styles.commitTitle}>Six chapters.{`\n`}One more complete human.</Text>
-        <Text style={styles.commitSubtitle}>Begin with seven days of Foundation. On hard days, {time} is enough. Small actions make a new identity believable.</Text>
+        <Text style={styles.commitKicker}>YOUR FIRST SEVEN DAYS</Text><Text style={styles.commitTitle}>Three paths.{`\n`}One more complete human.</Text>
+        <Text style={styles.commitSubtitle}>Begin with the seven-day foundation. On hard days, {time} is enough. Small actions make a new identity believable.</Text>
       </Animated.View>
       <Animated.View entering={FadeIn.delay(280).duration(600)} style={styles.promiseCard}>
         <View style={[styles.promiseIcon, { backgroundColor: `${SCORE_META[focus].color}20` }]}><Feather name={SCORE_META[focus].icon} size={22} color={SCORE_META[focus].color} /></View>
-        <View style={styles.promiseCopy}><Text style={styles.promiseLabel}>BEGIN WITH {SCORE_META[focus].label.toUpperCase()}</Text><Text style={styles.promiseText}>Start a challenge, practice inside the session, and record what happened. Begin with one; explore the others when you have room.</Text></View>
+        <View style={styles.promiseCopy}><Text style={styles.promiseLabel}>BEGIN WITH {SCORE_META[focus].label.toUpperCase()}</Text><Text style={styles.promiseText}>Unlock today’s quests, choose where to begin, and follow the reading, movement and business guidance.</Text></View>
       </Animated.View>
       <Animated.View entering={FadeInUp.delay(420).duration(520)} style={styles.holdArea}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Hold to begin your path" delayLongPress={900}
+        <Pressable accessibilityRole="button" accessibilityLabel="Begin your path"
           onPressIn={() => { hold.value = withTiming(1, { duration: 950 }); }}
           onPressOut={() => { cancelAnimation(hold); hold.value = withTiming(0, { duration: 180 }); }}
-          onLongPress={() => { hold.value = withSpring(1.08); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onUnlock(); }} style={styles.holdButton}>
+          onPress={() => { hold.value = withSpring(1.08); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onUnlock(); }} style={styles.holdButton}>
           <Animated.View style={[styles.holdRing, ring]} /><LinearGradient colors={[C.cyan, C.blue]} style={styles.holdCore}><Feather name="shield" size={35} color={C.bg} /></LinearGradient>
         </Pressable>
-        <Text style={styles.holdLabel}>PRESS AND HOLD TO BEGIN</Text><Text style={styles.holdHint}>Choose to return, even when the day is imperfect.</Text>
+        <Text style={styles.holdLabel}>TAP TO BEGIN</Text><Text style={styles.holdHint}>Choose to return, even when the day is imperfect.</Text>
       </Animated.View>
     </View>
   );
@@ -525,7 +456,7 @@ export default function OnboardingRoute() {
   const insets = useSafeAreaInsets(); const { setProfile } = useProgress();
   const [stage, setStage] = useState<Stage>('intro'); const [questionIndex, setQuestionIndex] = useState(0); const [direction, setDirection] = useState(1);
   const [answers, setAnswers] = useState<Partial<OnboardingProfile>>({});
-  const questions = useMemo(() => getQuestions(answers), [answers.beliefs, answers.fastingPreference]);
+  const questions = useMemo(() => getQuestions(answers), [answers.fastingPreference]);
   const question = questions[questionIndex];
   const selected = question?.key === 'priorityTracks' ? answers.priorityTracks : answers[question?.key] as string | undefined;
   const canContinue = question?.mode === 'ranked' ? Array.isArray(selected) && selected.length === 2 : Boolean(selected);
@@ -547,7 +478,6 @@ export default function OnboardingRoute() {
     }
     setAnswers((current) => {
       const nextAnswers = { ...current, [question.key]: value };
-      if (question.key === 'beliefs' && value !== 'faith') delete nextAnswers.faithTradition;
       if (question.key === 'fastingPreference' && value === 'off') delete nextAnswers.fastingSafety;
       return nextAnswers;
     });

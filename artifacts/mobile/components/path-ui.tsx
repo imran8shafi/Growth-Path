@@ -12,7 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdaptiveInsight } from '@/components/adaptive-insight';
 import { DailyRing } from '@/components/progress-visuals';
 import { MagicRings } from '@/components/magic-rings';
+import { useReducedMotionPreference } from '@/components/motion-bits';
 import { nativeTheme } from '@/lib/native-theme';
+import { Redirect } from 'expo-router';
 import { questChallenge, trainingTrackTasks } from '@/lib/training-catalog';
 import { sessionKey, type Challenge } from '@/lib/training-model';
 import type { Book, Quest, TrackKey } from '@/context/progress';
@@ -57,7 +59,7 @@ export const TRACKS: Record<TrackKey, TrackConfig> = {
   mind: { key: 'mind', label: 'Mind', title: 'Defend the last fortress.', description: 'Build focus, disciplined thought, and resistance to distraction and manipulation.', benefit: 'What governs your attention eventually governs your life.', icon: 'book-open', color: '#55D6FF', glow: 'rgba(85,214,255,0.22)', resource: { eyebrow: 'FORTRESS PRINCIPLE', title: 'Attention is a vote.', detail: 'What you repeatedly return to becomes the shape of your mind.', icon: 'crosshair' } },
   body: { key: 'body', label: 'Body', title: 'Build physical capability.', description: 'Train strength, energy, movement, and recovery—not appearance alone.', benefit: 'A capable body expands what the rest of your life can ask of you.', icon: 'activity', color: '#4CD6B0', glow: 'rgba(76,214,176,0.22)', resource: { eyebrow: 'CAPACITY PRINCIPLE', title: 'Energy must be built.', detail: 'Movement, recovery, and repetition create a body you can rely on.', icon: 'sunrise' } },
   soul: { key: 'soul', label: 'Soul', title: 'Strengthen conviction.', description: 'Examine what you believe, live it deliberately, and return to meaning.', benefit: 'Conviction keeps achievement from becoming directionless.', icon: 'sun', color: '#FFCC66', glow: 'rgba(255,204,102,0.22)', resource: { eyebrow: 'CONVICTION QUESTION', title: 'What deserves my devotion?', detail: 'Carry the answer into your choices, work, and relationships.', icon: 'heart' } },
-  freedom: { key: 'freedom', label: 'Freedom', title: 'Create the power to choose.', description: 'Build financial strength, portable skills, systems, and real mobility.', benefit: 'Freedom is having options that do not depend on permission.', icon: 'key', color: '#8D7CFF', glow: 'rgba(141,124,255,0.22)', resource: { eyebrow: 'AUTONOMY PRINCIPLE', title: 'Own the engine.', detail: 'Build skills and assets that keep working after today ends.', icon: 'compass' } },
+  freedom: { key: 'freedom', label: 'Financial Freedom', title: 'Create the power to choose.', description: 'Build financial strength, portable skills, systems, and real mobility.', benefit: 'Freedom is having options that do not depend on permission.', icon: 'key', color: '#8D7CFF', glow: 'rgba(141,124,255,0.22)', resource: { eyebrow: 'AUTONOMY PRINCIPLE', title: 'Own the engine.', detail: 'Build skills and assets that keep working after today ends.', icon: 'compass' } },
 };
 
 export function ScreenShell({ children, scroll = true, contentStyle }: { children: React.ReactNode; scroll?: boolean; contentStyle?: ViewStyle }) {
@@ -95,16 +97,17 @@ export function TaskRow({ onPress, isComplete: completeProp, index = 0, challeng
   const session = training.sessions[key];
   const complete = completeProp ?? (training.results.some((result) => result.sessionKey === key) || isComplete(id));
   const scale = useSharedValue(1);
+  const reduced = useReducedMotionPreference();
   const motion = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const handlePress = () => {
-    scale.value = withSequence(withSpring(0.975), withSpring(complete ? 1 : 1.018), withSpring(1));
+    if (!reduced) scale.value = withSequence(withSpring(0.975), withSpring(complete ? 1 : 1.018), withSpring(1));
     if (onPress) { onPress(); return; }
     const startChallenge = isComplete(id) && !training.results.some((result) => result.sessionKey === key) ? { ...challenge, quest: { ...challenge.quest, xp: 0 } } : challenge;
     dispatchTraining({ type: 'start', challenge: startChallenge, now: new Date().toISOString() });
     router.push(`/session?session=${encodeURIComponent(key)}` as Href);
   };
   return (
-    <Animated.View entering={FadeInDown.delay(index * 70).duration(430)} style={motion}>
+    <Animated.View entering={reduced ? undefined : FadeInDown.delay(Math.min(index * 70, 500)).duration(430)} style={motion}>
       <Pressable testID={`task-${id}`} accessibilityRole="button" accessibilityLabel={`${complete ? 'Review' : session ? 'Resume' : 'Start'} ${title}`} onPress={handlePress} style={[styles.taskRow, complete && { borderColor: `${trackColor}65`, backgroundColor: `${trackColor}10` }]}>
         <View style={[styles.taskAccent, { backgroundColor: trackColor }]} />
         <View style={[styles.check, { borderColor: complete ? trackColor : '#355065', backgroundColor: complete ? trackColor : '#102235' }]}><Feather name={complete ? 'check' : 'play'} size={14} color={complete ? '#050A12' : trackColor} /></View>
@@ -168,44 +171,7 @@ function BookCard({ book, color, reason, expanded, index, onPress }: { book: Boo
 }
 
 export function TrackScreen({ track }: { track: TrackKey }) {
-  const config = TRACKS[track];
-  const { profile, isComplete, hapticsEnabled, adaptivePlan, planDate, cycleStartedAt } = useProgress();
-  const router = useRouter();
-  const tasks = trainingTrackTasks(track, profile, planDate, adaptivePlan, cycleStartedAt);
-  const books = getRecommendedBooks(track, profile);
-  const completed = tasks.filter((task) => isComplete(task.id)).length;
-  const [expandedBook, setExpandedBook] = useState<string | null>(books[0]?.id ?? null);
-  const readingStyle = profile?.readingStyle === 'practical' ? 'fast, practical ideas' : profile?.readingStyle === 'deep' ? 'deeper philosophy and reflection' : profile?.readingStyle === 'exercises' ? 'practice-first learning' : 'a mix of tools and deeper ideas';
-  return (
-    <ScreenShell>
-      <View style={styles.pagePadding}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}><Feather name="arrow-left" size={19} color="#F6FBFF" /><Text style={styles.backText}>TODAY</Text></Pressable>
-        <ScreenHeader eyebrow={`${config.label.toUpperCase()} PATH`} title={config.title} subtitle={config.description} icon={config.icon} color={config.color} />
-        <Animated.View entering={FadeInDown.delay(120).duration(520)} style={[styles.pathHero, { borderColor: `${config.color}45`, backgroundColor: config.glow }]}>
-          <View style={styles.pathHeroCopy}><Text style={[styles.heroEyebrow, { color: config.color }]}>TODAY’S SIGNAL</Text><Text style={styles.heroTitle}>{completed === 3 ? 'Path complete.' : `${3 - completed} quest${3 - completed === 1 ? '' : 's'} remain.`}</Text><Text style={styles.heroBody}>{config.benefit}</Text></View>
-          <DailyRing completed={completed} total={3} size={104} />
-        </Animated.View>
-        <AdaptiveInsight track={track} />
-        <View style={styles.sectionRow}><Text style={styles.sectionLabel}>Today’s practice</Text><Text style={[styles.sectionMeta, { color: config.color }]}>{completed}/3 COMPLETE</Text></View>
-        <View style={styles.taskList}>{tasks.map((task, index) => <TaskRow key={task.id} {...task} trackColor={config.color} index={index} />)}</View>
-        <Animated.View entering={FadeInDown.delay(320).duration(520)} style={[styles.resourceCard, { borderColor: `${config.color}45` }]}>
-          <View style={[styles.resourceIcon, { backgroundColor: `${config.color}1D` }]}><Feather name={config.resource.icon} size={21} color={config.color} /></View>
-          <View style={styles.resourceCopy}><Text style={[styles.resourceEyebrow, { color: config.color }]}>{config.resource.eyebrow}</Text><Text style={styles.resourceTitle}>{config.resource.title}</Text><Text style={styles.resourceDetail}>{config.resource.detail}</Text></View>
-        </Animated.View>
-        <View style={styles.booksHeader}>
-          <View><Text style={styles.sectionLabel}>Books for your path</Text><Text style={styles.booksSubtitle}>Chosen for {readingStyle}</Text></View>
-          <View style={[styles.personalizedPill, { borderColor: `${config.color}50` }]}><Feather name="sliders" size={11} color={config.color} /><Text style={[styles.personalizedText, { color: config.color }]}>PERSONALIZED</Text></View>
-        </View>
-        <View style={styles.bookList}>
-          {books.map((book, index) => <BookCard key={book.id} book={book} color={config.color} reason={getBookReason(book, profile)} expanded={expandedBook === book.id} index={index} onPress={() => {
-            if (hapticsEnabled) void Haptics.selectionAsync();
-            setExpandedBook((current) => current === book.id ? null : book.id);
-          }} />)}
-        </View>
-        <Pressable testID={`back-home-${track}`} onPress={() => router.replace('/')} style={styles.returnButton}><Text style={styles.returnText}>Return to today</Text><Feather name="arrow-right" size={17} color="#050A12" /></Pressable>
-      </View>
-    </ScreenShell>
-  );
+  return <Redirect href="/" />;
 }
 
 const styles = StyleSheet.create({

@@ -14,6 +14,7 @@ function solve(state, key) {
   let session = state.sessions[key];
   while (session.stageIndex < session.challenge.stages.length) {
     const stage = session.challenge.stages[session.stageIndex];
+    if (stage.type === 'attention') for (const cue of stage.cues) state = reduceTraining(state, { type: 'answer', key, answer: { attention: [...(state.sessions[key].answers[stage.id]?.attention ?? []), cue === stage.target] } });
     if (stage.type === 'ideas') state = reduceTraining(state, { type: 'answer', key, answer: { ideas: ['first idea', 'FIRST IDEA', 'second idea'] } });
     if ('seconds' in stage) for (let seconds = 0; seconds < stage.seconds; seconds += 2) state = reduceTraining(state, { type: 'tick', key, seconds: 2 });
     const answer = stage.type === 'write' ? { text: 'A specific example with an action and a concrete observation.' }
@@ -21,7 +22,9 @@ function solve(state, key) {
       : stage.type === 'rating' ? { rating: 3 }
       : stage.type === 'recall' ? { text: stage.words.join(', ') }
       : stage.type === 'performance' ? { value: 12, variant: stage.variants[0] }
-      : stage.type === 'checklist' ? { checks: [0] } : null;
+      : stage.type === 'checklist' ? { checks: [0] }
+      : stage.type === 'lesson' ? { acknowledged: true }
+      : stage.type === 'values' ? { values: [stage.options[0]] } : null;
     if (answer) state = reduceTraining(state, { type: 'answer', key, answer });
     assert.equal(stageValid(stage, state.sessions[key].answers[stage.id]), true, `Completable stage ${stage.type}`);
     state = reduceTraining(state, { type: 'next', key }); session = state.sessions[key];
@@ -113,7 +116,8 @@ assert.equal(make('body-strength', { ...profile, movementLimit: 'knees' }).stage
 // Session completion + progress + XP are atomic and survive repeated callbacks/reload.
 render().setProfile(profile);
 let current = slots[0];
-current = progress.applyTrainingAction(current, { type: 'start', challenge: reason, now });
+// Historical snapshots still round-trip; new starts are tested against the guided planner separately.
+current = { ...current, training: reduceTraining(current.training, { type: 'start', challenge: reason, now }) };
 current = { ...current, training: solve(current.training, rKey) };
 const saved = progress.applyTrainingAction(current, { type: 'finish', key: rKey, now });
 assert.equal(saved.totalCompleted, current.totalCompleted + 1);
@@ -125,10 +129,55 @@ const noDoubleAward = progress.applyTrainingAction(legacy, { type: 'finish', key
 assert.equal(noDoubleAward.training.results[0].xp, 0);
 assert.equal(noDoubleAward.totalCompleted, legacy.totalCompleted);
 const movement = make('body-strength');
-let movementState = progress.applyTrainingAction(slots[0], { type: 'start', challenge: movement, now });
+let movementState = { ...slots[0], training: reduceTraining(slots[0].training, { type: 'start', challenge: movement, now }) };
 movementState = { ...movementState, profile: { ...profile, movementLimit: 'knees' } };
 assert.equal(progress.applyTrainingAction(movementState, { type: 'answer', key: sessionKey(movement), answer: { option: '0' } }), movementState, 'New movement restrictions block an incompatible draft');
 assert.equal(progress.getCycleProgress('2026-03-07', new Date(2026, 2, 9, 12)).day, 3, 'Civil-day cycle survives daylight saving');
 const archived = { ...emptyTraining(), results: [b], sessions: {} };
 assert.equal(reduceTraining(archived, { type: 'start', challenge: baseline, now }), archived, 'Archived results retain their reward identity');
+
+// Attention attempts are sequential and immutable, including across saved drafts.
+const composure = make('body-breathe');
+const attentionStage = composure.stages.find((s) => s.type === 'attention');
+const attentionChallenge = { ...composure, stages: [attentionStage] };
+const attentionKey = sessionKey(attentionChallenge);
+let attentionState = reduceTraining(emptyTraining(), { type: 'start', challenge: attentionChallenge, now });
+assert.equal(reduceTraining(attentionState, { type: 'answer', key: attentionKey, answer: { attention: [true, true] } }), attentionState, 'Cannot jump ahead in an attention check');
+attentionState = reduceTraining(attentionState, { type: 'answer', key: attentionKey, answer: { attention: [false] } });
+assert.equal(reduceTraining(attentionState, { type: 'answer', key: attentionKey, answer: { attention: [true, true] } }), attentionState, 'Cannot rewrite earlier responses');
+assert.equal(stageValid(attentionStage, { attention: [true] }), false);
+const composedResult = resultFor(composure, date);
+assert.equal(composedResult.metrics.filter((m) => m.label.startsWith('Attention')).length, 2);
+assert.equal(composedResult.metrics.filter((m) => m.label.startsWith('Attention')).every((m) => m.value === 100), true);
+
+// Library reaches every skill; overlapping daily challenges keep their reward identity.
+const library = catalog.practiceChallenges(profile, emptyTraining(), date, start);
+assert.equal(new Set(library.map((c) => c.skill)).size, 15);
+assert.equal(sessionKey(library.find((c) => c.quest.id === 'mind-focus')), sessionKey(make('mind-focus')));
+for (const c of library) resultFor(c, date);
+
+// Audio references contain no external URLs or file paths, and cannot bypass unrelated timers.
+const speak = library.find((c) => c.skill === 'storytelling').stages.find((s) => s.mode === 'speak');
+assert.equal(stageValid(speak, cleanAnswer(speak, { recording: { id: 'https://example.com', seconds: 60 } })), false);
+assert.equal(stageValid(speak, cleanAnswer(speak, { recording: { id: 'take-abc-123', seconds: 60 } })), true);
+assert.equal(stageValid(focus.stages.find((s) => s.type === 'timer'), { recording: { id: 'take-abc', seconds: 60 } }), false);
+assert.equal(cleanAnswer(speak, { recording: { id: 'take-abc', seconds: Infinity } }).recording, undefined);
+const storyChallenge = library.find((c) => c.skill === 'storytelling');
+const storyKey = sessionKey(storyChallenge);
+let storyState = reduceTraining(emptyTraining(), { type: 'start', challenge: storyChallenge, now });
+storyState = reduceTraining(storyState, { type: 'answer', key: storyKey, answer: { text: 'An opening that stays intact.' } });
+storyState = reduceTraining(storyState, { type: 'recording', key: storyKey, stageId: speak.id, recording: { id: 'take-late-save', seconds: 15 } });
+assert.equal(storyState.sessions[storyKey].answers.hook.text, 'An opening that stays intact.');
+assert.equal(storyState.sessions[storyKey].answers.speak.recording.id, 'take-late-save', 'Late audio saves target the speaking stage');
+const invalidAudio = reduceTraining(storyState, { type: 'recording', key: storyKey, stageId: 'hook', recording: { id: 'take-invalid', seconds: 15 } });
+assert.equal(invalidAudio, storyState, 'Cannot attach audio to another stage');
+
+// Explicit values survive as result data, and badges derive only from completed results.
+const rewards = loadSource('lib/training-rewards.ts');
+const valuesResult = resultFor(make('soul-values'), date);
+assert.equal(rewards.valueMap([valuesResult])[0].value, 'Honesty');
+assert.equal(rewards.achievements([]).some((a) => a.earned), false);
+assert.equal(rewards.newAchievements([valuesResult], valuesResult.sessionKey).some((a) => a.id === 'first-result'), true);
+const nextResult = { ...valuesResult, sessionKey: 'second', date: '2026-09-16' };
+assert.equal(rewards.newAchievements([valuesResult, nextResult], nextResult.sessionKey).some((a) => a.id === 'first-result'), false);
 console.log(`PASS: ${all.length} recipes, all seven mechanics, required interactions, timers, resume, scoring, difficulty, daily consistency, 42-day retest, and atomic XP.`);

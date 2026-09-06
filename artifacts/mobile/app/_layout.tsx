@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useDesignSystemFonts } from '@/hooks/use-fonts';
 import { ProgressProvider, useProgress } from '@/context/progress';
+import { RecordingCleanup } from '@/components/recording-cleanup';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -24,6 +25,8 @@ function RootLayoutNav() {
       <Stack.Protected guard={Boolean(profile)}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="session" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="practice" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="programme-settings" options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack.Protected>
       <Stack.Protected guard={!profile}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -50,6 +53,7 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <ProgressProvider>
+                <RecordingCleanup />
                 <RootLayoutNav />
               </ProgressProvider>
             </KeyboardProvider>

@@ -27,7 +27,7 @@ export function DailyRing({ completed, total, size = 122 }: { completed: number;
         <Circle cx={size / 2} cy={size / 2} r={radius} stroke={CHART.track} strokeWidth={stroke} fill="none" />
         <Circle cx={size / 2} cy={size / 2} r={radius} stroke="url(#dailyRing)" strokeWidth={stroke} fill="none"
           strokeLinecap="round" strokeDasharray={`${Math.max(progress * circumference, 2)} ${circumference}`}
-          rotation="-90" origin={`${size / 2}, ${size / 2}`} />
+          transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       </Svg>
       <View style={styles.ringValue}>
         <Text style={styles.ringNumber}>{completed}/{total}</Text><Text style={styles.ringLabel}>QUESTS</Text>

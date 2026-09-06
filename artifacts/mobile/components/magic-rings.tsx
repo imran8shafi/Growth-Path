@@ -5,7 +5,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useReducedMotionPreference } from './motion-bits';
 import { createRingRenderer } from '@/lib/magic-rings-renderer';
 
-export function MagicRings() {
+export function MagicRings({ variant = 'rings', size = 240, playing = true }: { variant?: 'rings' | 'orb'; size?: number; playing?: boolean }) {
   const reduced = useReducedMotionPreference(); const focused = useIsFocused();
   const [active, setActive] = useState(AppState.currentState === 'active');
   const [failed, setFailed] = useState(false);
@@ -17,18 +17,19 @@ export function MagicRings() {
   useEffect(() => {
     if (!renderer.current) return;
     renderer.current.draw(2);
-    if (reduced || !active || !focused) return;
+    if (reduced || !active || !focused || !playing) return;
     const started = Date.now();
     const interval = setInterval(() => renderer.current?.draw(2 + (Date.now() - started) / 1000), 1000 / 24);
     return () => clearInterval(interval);
-  }, [reduced, focused, active, ready]);
+  }, [reduced, focused, active, ready, playing]);
   const create = (gl: ExpoWebGLRenderingContext) => {
     if (!mounted.current) return;
-    try { renderer.current?.dispose(); renderer.current = createRingRenderer(gl as unknown as WebGLRenderingContext, () => gl.endFrameEXP()); setReady((n) => n + 1); }
+    try { renderer.current?.dispose(); renderer.current = createRingRenderer(gl as unknown as WebGLRenderingContext, () => gl.endFrameEXP(), variant); setReady((n) => n + 1); }
     catch { setFailed(true); }
   };
-  return <View pointerEvents="none" importantForAccessibility="no-hide-descendants" style={styles.container}>
-    {failed ? <StaticRings /> : <GLView style={StyleSheet.absoluteFill} onContextCreate={create} msaaSamples={0} />}
+  return <View pointerEvents="none" importantForAccessibility="no-hide-descendants" style={variant === 'orb' ? { width: size, height: size, alignSelf: 'center' } : styles.container}>
+    {variant === 'orb' ? <View style={{ position: 'absolute', inset: size * .2, borderRadius: size, backgroundColor: '#292157', borderWidth: 1, borderColor: '#8D7CFF' }} /> : null}
+    {failed ? variant === 'rings' ? <StaticRings /> : null : <GLView style={StyleSheet.absoluteFill} onContextCreate={create} msaaSamples={0} />}
   </View>;
 }
 export function StaticRings() { return <View style={StyleSheet.absoluteFill}>{[0, 1, 2, 3, 4].map((i) => <View key={i} style={{ position: 'absolute', width: 150 + i * 65, height: 150 + i * 65, borderRadius: 300, borderWidth: 1, borderColor: i % 2 ? '#8D7CFF' : '#55D6FF', opacity: .2, alignSelf: 'center', top: 160 - i * 32.5 }} />)}</View>; }

@@ -1,4 +1,46 @@
-# Jack of All: interactive training
+# Jack of All: guided main programmes
+
+## Current quest experience
+
+Home leads with Today's quests and an unlock button opening a three-path picker.
+Any assigned quest can be taken first; completed quests cannot award XP again.
+Mind uses attributed public-domain Enchiridion excerpts, source links, and a saved
+foreground reading stopwatch with no time gate. Decision questions become reading
+guidance. Body's two foundation workout days include animated sit-to-stand and
+supported calf-raise guides, with pause and reduced-motion positions. Movement
+restrictions retain the existing suitable-routine alternative.
+
+Onboarding shows a progress bar without question counts and concrete seven-day
+milestones instead of invented capability scores or promised percentage gains.
+The authored foundation remains seven assignments per active path. Old draft
+formats are retired while result history stays saved. The three-path daily mix
+uses estimated short, medium, or longer time allocations.
+
+## Current product direction — September 6, 2026
+
+The main-only programme flow supersedes the legacy catalogue described below.
+Home assigns one, two, or four sessions for the selected time budget, with one
+next action. Library and old path links return to Home. Storytelling, breathing,
+optional trials, and extra practice are not assigned. Historical results remain.
+
+Seven foundation assignments are authored per path: sourced thinking lessons and
+dilemmas; movement, meals and recovery; preference-aware religious or ethical
+practice; and separate service business, SaaS and app business routes. Business
+templates are saved with sessions and reused during the programme. These are
+introductory foundations, not a complete business launch or clinical diet plan.
+
+Required stages validate input, save unfinished work, and keep difficult work for
+another practice day. Only the next assigned session can start. Completing the
+main plan earns the daily bonus once, including the ten-minute plan. Progress and
+Evolve show programme milestones without promising unimplemented Day 42 tests.
+Existing animated borders, transitions and result effects retain reduced-motion
+support. The remaining curriculum beyond the foundation is not implemented.
+
+Validation: typecheck; test:programmes (84 content variants, sequencing, preference
+changes, missed days, validation, daily rewards and duplicate completion); legacy
+training, adaptive and recording suites. Browser checks cover entry and save/resume.
+
+## Historical engine implementation (compatibility reference)
 
 ## Product changes
 
@@ -17,6 +59,7 @@ XP. The loop is brief → interaction → result → difficulty feedback → pro
 | Rewards | Atomic XP/result updates, completion haptics, animated results, rank reveals, personal bests, and chapter/retest achievements. |
 | Animation | Actual React Bits MagicRings fragment shader in onboarding and shared screen backgrounds; Expo GL on native, WebGL on web. Existing React Bits-inspired borders, spotlights, text reveals, and count-ups frame sessions and results. |
 | Social starting point | User-initiated result sharing and the existing accountability invitation. No background messages or automatic posting. |
+| Story recording | Optional local Storycraft recording with explicit microphone permission, pause-safe capture, replay/delete, and platform-local storage. No upload or transcription. |
 
 ## Content and measurement
 
@@ -77,8 +120,9 @@ layer. Source attribution and full license are in `THIRD_PARTY_NOTICES.md` and
 
 ## Deliberately not represented as finished features
 
-- Storycraft supports speaking aloud and saving a written version. It does not
-  record microphone audio, transcribe, or pretend to analyze a recording.
+- Storycraft supports speaking aloud, saving a written version, and optionally
+  recording a take locally. The recording is replayable and deletable on-device;
+  it is not uploaded, transcribed, or scored by AI.
 - There is no AI evaluation service, cloud account system, friend graph,
   synchronized accountability group, or public leaderboard. Sharing opens the
   device's share UI and leaves the recipient and send action to the user.
@@ -97,6 +141,7 @@ Run from `artifacts/mobile`:
 pnpm install
 pnpm test:adaptive
 pnpm test:training
+pnpm test:recording
 pnpm typecheck
 pnpm exec expo export --platform all
 ```
@@ -109,12 +154,25 @@ draft serialization, and exactly-once awards.
 
 Before release, test on physical iOS and Android devices: keyboard/scroll behavior,
 background/resume and reload, GL fallback, reduced motion, shader smoothness,
-storage failures, and the share sheet. The cloud test browser could not connect to
-the workspace-local preview, so this change has not been visually/device tested.
+storage failures, and the share sheet. The implementation preview was checked for the
+Library, mobile Composure flow, attention gating, and paused timer persistence.
+After the usage reset on September 6, browser checks also covered Storycraft's
+writing gate, completed preparation timer, and recorder controls. Recorder startup
+now cancels if focus is lost during permission, audio-mode setup, or preparation;
+regression tests cover all nine interruption cases. Physical microphone capture
+and iOS/Android validation remain required.
 
 ## Reference sources
 
 - [React Bits MagicRings source](https://github.com/DavidHDev/react-bits/blob/main/src/content/Animations/MagicRings/MagicRings.jsx)
+- [ThreeUI EnergyOrb shader source](https://github.com/MengTo/threeui)
+- [Componentry Kinetic Text Reveal](https://componentry.dev/docs/components/kinetic-text-reveal)
+- [Raylight motion reference](https://raylight.app/)
 - [Expo GLView documentation](https://docs.expo.dev/versions/latest/sdk/gl-view/)
 - [NHS strength exercise guidance](https://www.nhs.uk/live-well/exercise/strength-exercises/)
 - [NHS warm-up and stopping guidance](https://www.nhs.uk/live-well/exercise/how-to-warm-up-before-exercising/)
+
+Latest simplification: one mixed daily quest picker; small category labels only inside sessions. Home now includes locked XP ranks, and Evolve redirects home. Reading is embedded, with foreground stopwatch and saved-draft compatibility. Sit-to-stand and calf-raise demos animate with pause/reduced-motion support. Progress and completed quests offer a previewable 4:5 image through the native share sheet. SDK remains 54. TypeScript, programme variants and Android bundle verified; physical-device share export and stopwatch UI remain to be checked.
+
+Arise concept follow-up: Evolve restored as current-rank programme browsing for Mind, Body and Financial Freedom; future ranks remain locked. Available cards expand to the actual seven-step programme and open only today's assigned quest. Financial Freedom uses supplied starter projects and three short actions, shown one at a time, with no required forms or end-of-quest questionnaire. Legacy unfinished financial drafts refresh without removing their saved answers or changing results. Completion uses the neutral difficulty value internally; no difficulty response is requested. Browser checked current-rank cards, locks, programme expansion and sequential instructions. Onboarding's final start action now works with one tap/keyboard activation.
+Browser verification also confirmed saved-step resume after reload and direct completion awarding 40 XP without a questionnaire. These checks used a separate browser-local preview profile; phone progress was not changed.

@@ -4,7 +4,7 @@ export type SkillKey = 'focus' | 'reasoning' | 'memory' | 'storytelling' | 'stre
 export type Mechanic = 'timer' | 'performance' | 'decision' | 'creation' | 'field' | 'skill' | 'boss';
 export type ChallengeCategory = 'quest' | 'trial' | 'mission' | 'boss';
 export type Feedback = 'easy' | 'right' | 'hard';
-type StageBase = { id: string; title: string; prompt: string };
+type StageBase = { id: string; title: string; prompt: string; source?: { title: string; url: string }; help?: string; reading?: { passage: string; attribution: string }; demonstration?: 'sit-stand' | 'calf-raise' };
 export type Stage = StageBase & (
   | { type: 'write'; minimum: number; placeholder?: string }
   | { type: 'choice'; options: { id: string; label: string; response: string; correct?: boolean }[] }
@@ -14,16 +14,25 @@ export type Stage = StageBase & (
   | { type: 'recall'; words: string[]; seconds: number }
   | { type: 'performance'; unit: string; maximum: number; variants: string[] }
   | { type: 'checklist'; items: string[] }
+  | { type: 'lesson'; points: string[]; example: string; seconds?: number }
+  | { type: 'action'; steps: string[]; alternative: string }
+  | { type: 'artifact'; fields: { id: string; label: string; example: string }[] }
+  | { type: 'attention'; cues: string[]; target: string }
+  | { type: 'values'; options: string[]; maximum: number }
 );
 export type Challenge = {
   quest: Quest; mechanic: Mechanic; category: ChallengeCategory; skill: SkillKey;
   secondarySkills?: SkillKey[]; level: number; stages: Stage[]; minutes: number;
   scope: string; cycle: number; cycleDay: number; reason: string;
   movementLimit?: OnboardingProfile['movementLimit'];
+  programme?: { title: string; step: number; total: number; outcome: string; next: string };
 };
 export type StageAnswer = {
   text?: string; option?: string; rating?: number; ideas?: string[]; checks?: number[];
   value?: number; variant?: string; elapsed?: number;
+  acknowledged?: boolean; attention?: boolean[]; values?: string[];
+  recording?: { id: string; seconds: number };
+  fields?: Record<string, string>; alternative?: boolean;
 };
 export type TrainingSession = {
   key: string; challenge: Challenge; startedAt: string; stageIndex: number;
@@ -36,6 +45,7 @@ export type TrainingResult = {
   skill: SkillKey; secondarySkills: SkillKey[]; level: number; date: string;
   category: ChallengeCategory; cycle: number; cycleDay: number; feedback: Feedback;
   successful: boolean; metrics: Metric[]; xp: number; completedAt: string;
+  values?: string[];
 };
 export type TrainingState = { version: 1; sessions: Record<string, TrainingSession>; results: TrainingResult[] };
 export const emptyTraining = (): TrainingState => ({ version: 1, sessions: {}, results: [] });
@@ -85,6 +95,12 @@ export function trainingLevel(skill: SkillKey, profile: OnboardingProfile | null
 
 export function cleanAnswer(stage: Stage, input: StageAnswer): StageAnswer {
   const answer: StageAnswer = {};
+  if (stage.type === 'artifact') answer.fields = Object.fromEntries(stage.fields.map((f) => [f.id, typeof input.fields?.[f.id] === 'string' ? input.fields[f.id].slice(0, 500) : '']));
+  if (stage.type === 'action') { answer.checks = [...new Set((input.checks ?? []).filter((n) => Number.isInteger(n) && n >= 0 && n < stage.steps.length))]; answer.alternative = input.alternative === true; }
+  if (stage.type === 'lesson') answer.acknowledged = input.acknowledged === true;
+  if (stage.type === 'attention' && Array.isArray(input.attention)) answer.attention = input.attention.filter((v) => typeof v === 'boolean').slice(0, stage.cues.length);
+  if (stage.type === 'values' && Array.isArray(input.values)) answer.values = [...new Set(input.values.filter((v) => stage.options.includes(v)))].slice(0, stage.maximum);
+  if (stage.type === 'timer' && stage.mode === 'speak' && input.recording && /^take-[a-z0-9-]+$/.test(input.recording.id) && Number.isFinite(input.recording.seconds) && input.recording.seconds > 0 && input.recording.seconds <= stage.seconds + 2) answer.recording = input.recording;
   if (typeof input.text === 'string') answer.text = input.text.slice(0, 2000);
   if (stage.type === 'choice' && stage.options.some((o) => o.id === input.option)) answer.option = input.option;
   if (stage.type === 'rating' && Number.isInteger(input.rating) && input.rating! >= 1 && input.rating! <= 5) answer.rating = input.rating;
@@ -100,14 +116,19 @@ export function cleanAnswer(stage: Stage, input: StageAnswer): StageAnswer {
 
 export function stageValid(stage: Stage, a: StageAnswer = {}): boolean {
   switch (stage.type) {
+    case 'action': return a.alternative === true || stage.steps.every((_, i) => a.checks?.includes(i));
+    case 'artifact': return stage.fields.every((f) => (a.fields?.[f.id]?.trim().length ?? 0) >= 2);
     case 'write': return (a.text?.trim().length ?? 0) >= stage.minimum;
     case 'choice': return stage.options.some((o) => o.id === a.option);
-    case 'timer': return (a.elapsed ?? 0) >= stage.seconds;
+    case 'timer': return (stage.mode === 'speak' && (a.recording?.seconds ?? 0) >= 3) || (a.elapsed ?? 0) >= stage.seconds;
     case 'rating': return Number.isInteger(a.rating) && a.rating! >= 1 && a.rating! <= 5;
     case 'ideas': return (a.elapsed ?? 0) >= stage.seconds && (a.ideas?.length ?? 0) >= stage.minimum;
     case 'recall': return (a.elapsed ?? 0) >= stage.seconds && Boolean(a.text?.trim());
     case 'performance': return Number.isFinite(a.value) && a.value! >= 0 && a.value! <= stage.maximum && stage.variants.includes(a.variant ?? '');
     case 'checklist': return (a.checks?.length ?? 0) > 0;
+    case 'lesson': return a.acknowledged === true;
+    case 'attention': return a.attention?.length === stage.cues.length && a.attention.every((v) => typeof v === 'boolean');
+    case 'values': return Boolean(a.values?.length && a.values.length <= stage.maximum && a.values.every((v) => stage.options.includes(v)));
   }
 }
 export function sessionValid(session: TrainingSession) { return session.challenge.stages.every((stage) => stageValid(stage, session.answers[stage.id])) && ['easy', 'right', 'hard'].includes(session.feedback ?? ''); }
@@ -120,6 +141,7 @@ export function sessionResult(session: TrainingSession, now = new Date()): Train
   const { challenge: c } = session; const metrics: Metric[] = []; let correct = 0; let possible = 0; let hasPractice = true;
   for (const stage of c.stages) {
     const a = session.answers[stage.id] ?? {};
+    if (stage.type === 'action' && a.alternative) hasPractice = false;
     const protocol = `${c.quest.id}:v1:${stage.id}:L${c.level}`;
     if (stage.type === 'ideas' && !a.ideas?.length) hasPractice = false;
     if (stage.type === 'performance' && (!a.value || a.variant === 'Recovery review')) hasPractice = false;
@@ -128,14 +150,22 @@ export function sessionResult(session: TrainingSession, now = new Date()): Train
     if (stage.type === 'ideas') metrics.push({ protocol: `${protocol}:${stage.seconds}:${stage.prompt}`, label: 'Distinct entries', value: a.ideas?.length ?? 0, unit: `in ${stage.seconds}s` });
     if (stage.type === 'performance') metrics.push({ protocol: `${protocol}:${a.variant}`, label: a.variant ?? stage.title, value: a.value ?? 0, unit: stage.unit });
     if (stage.type === 'timer' && stage.mode === 'focus') metrics.push({ protocol: `${protocol}:${stage.seconds}`, label: 'Timed focus', value: Math.round((a.elapsed ?? 0) / 6) / 10, unit: 'min' });
+    if (stage.type === 'attention') {
+      const score = stage.cues.filter((cue, i) => a.attention?.[i] === (cue === stage.target)).length;
+      correct += score; possible += stage.cues.length;
+      metrics.push({ protocol: `${protocol}:${stage.cues.length}`, label: stage.id.includes('before') ? 'Attention before reset' : 'Attention after reset', value: Math.round(score / stage.cues.length * 100), unit: '%' });
+    }
   }
   if (possible) metrics.push({ protocol: `${c.quest.id}:v1:accuracy:L${c.level}`, label: 'Practice accuracy', value: Math.round(correct / possible * 100), unit: '%' });
-  return { sessionKey: session.key, questId: c.quest.id, title: c.quest.title, track: c.quest.track, trait: c.quest.trait, skill: c.skill, secondarySkills: c.secondarySkills ?? [], level: c.level, date: dateKey(now), category: c.category, cycle: c.cycle, cycleDay: c.cycleDay, feedback: session.feedback!, successful: hasPractice && (possible === 0 || correct / possible >= 0.7), metrics, xp: c.quest.xp, completedAt: now.toISOString() };
+  const values = [...new Set(c.stages.filter((s) => s.type === 'values').flatMap((s) => session.answers[s.id]?.values ?? []))];
+  if (c.programme && session.feedback === 'hard') hasPractice = false;
+  return { sessionKey: session.key, questId: c.quest.id, title: c.quest.title, track: c.quest.track, trait: c.quest.trait, skill: c.skill, secondarySkills: c.secondarySkills ?? [], level: c.level, date: dateKey(now), category: c.category, cycle: c.cycle, cycleDay: c.cycleDay, feedback: session.feedback!, successful: hasPractice && (possible === 0 || correct / possible >= 0.7), metrics, xp: c.quest.xp, completedAt: now.toISOString(), values };
 }
 
 export type TrainingAction =
   | { type: 'start'; challenge: Challenge; now: string }
   | { type: 'answer'; key: string; answer: StageAnswer }
+  | { type: 'recording'; key: string; stageId: string; recording?: StageAnswer['recording'] }
   | { type: 'tick'; key: string; seconds: number }
   | { type: 'next'; key: string }
   | { type: 'feedback'; key: string; value: Feedback }
@@ -151,6 +181,16 @@ export function reduceTraining(current: TrainingState, action: TrainingAction): 
     return { ...current, sessions: { ...current.sessions, [key]: session } };
   }
   const session = current.sessions[action.key];
+  // Audio saving can finish after navigation. Address its stage explicitly instead of
+  // accidentally replacing the answer on whatever stage is now visible.
+  if (session && action.type === 'recording') {
+    const stage = session.challenge.stages.find((s) => s.id === action.stageId);
+    if (!stage || stage.type !== 'timer' || stage.mode !== 'speak') return current;
+    const recording = cleanAnswer(stage, { recording: action.recording }).recording;
+    if (action.recording && !recording) return current;
+    const updated = { ...session, answers: { ...session.answers, [stage.id]: { ...session.answers[stage.id], recording } } };
+    return { ...current, sessions: { ...current.sessions, [action.key]: updated } };
+  }
   if (!session || session.status === 'complete') return current;
   if (action.type === 'discard') { const sessions = { ...current.sessions }; delete sessions[action.key]; return { ...current, sessions }; }
   let next = session;
@@ -161,11 +201,15 @@ export function reduceTraining(current: TrainingState, action: TrainingAction): 
     if (stage.type === 'choice' && old.option) return current;
     if (stage.type === 'ideas' && (old.elapsed ?? 0) >= stage.seconds) return current;
     if (stage.type === 'recall' && (old.elapsed ?? 0) < stage.seconds) return current;
+    if (stage.type === 'attention') {
+      const previous = old.attention ?? []; const incoming = action.answer.attention ?? [];
+      if (incoming.length !== previous.length + 1 || incoming.length > stage.cues.length || previous.some((v, i) => incoming[i] !== v) || typeof incoming[incoming.length - 1] !== 'boolean') return current;
+    }
     next = { ...session, answers: { ...session.answers, [stage.id]: { ...cleanAnswer(stage, action.answer), elapsed: old.elapsed } } };
   }
   if (action.type === 'tick' && stage && ('seconds' in stage) && Number.isFinite(action.seconds)) {
     const old = session.answers[stage.id] ?? {};
-    next = { ...session, answers: { ...session.answers, [stage.id]: { ...old, elapsed: Math.min(stage.seconds, (old.elapsed ?? 0) + Math.max(0, Math.min(2, action.seconds))) } } };
+    next = { ...session, answers: { ...session.answers, [stage.id]: { ...old, elapsed: Math.min(stage.seconds ?? 3600, (old.elapsed ?? 0) + Math.max(0, Math.min(2, action.seconds))) } } };
   }
   if (action.type === 'next' && stage && stageValid(stage, session.answers[stage.id])) next = { ...session, stageIndex: Math.min(session.challenge.stages.length, session.stageIndex + 1) };
   if (action.type === 'feedback' && ['easy', 'right', 'hard'].includes(action.value)) next = { ...session, feedback: action.value };

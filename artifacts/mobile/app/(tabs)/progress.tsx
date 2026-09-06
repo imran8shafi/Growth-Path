@@ -3,9 +3,10 @@ import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { AdaptiveInsight } from '@/components/adaptive-insight';
+
+import { ShareProgress } from '@/components/share-progress';
 import { MomentumChart } from '@/components/progress-visuals';
-import { SkillDashboard } from '@/components/training-hub';
+import { ProgrammeDashboard } from '@/components/programme-dashboard';
 import { ScreenHeader, ScreenShell, TRACKS } from '@/components/path-ui';
 import { nativeTheme } from '@/lib/native-theme';
 import { type TrackKey, useProgress } from '@/context/progress';
@@ -30,17 +31,17 @@ export default function ProgressRoute() {
   const { totalCompleted, totalXp, level, levelProgress, currentStreak, achievements, trackCompleted, trackXp, weeklyXp, hapticsEnabled } = useProgress();
   const [selectedTrack, setSelectedTrack] = useState<TrackKey>('mind');
   const selected = TRACKS[selectedTrack];
-  const pathScores = (Object.keys(TRACKS) as TrackKey[]).map((track) => trackXp(track));
+  const pathScores = (Object.keys(TRACKS) as TrackKey[]).filter((track) => track !== 'soul').map((track) => trackXp(track));
   const strongestPath = Math.max(...pathScores);
   const balanceScore = strongestPath === 0 ? 0 : Math.round((Math.min(...pathScores) / strongestPath) * 100);
   return (
     <ScreenShell>
       <View style={styles.pagePadding}>
-        <ScreenHeader eyebrow="YOUR PROGRESS" title="Proof you returned." subtitle="Explore the shape of your effort—not just the final score." icon="trending-up" />
+        <ScreenHeader eyebrow="YOUR PROGRESS" title="Proof you returned." subtitle="Review completed assignments and recorded effort." icon="trending-up" />
 
         <Animated.View entering={FadeInDown.delay(80).duration(520)} style={styles.levelCard}>
           <View style={styles.levelGlow} />
-          <View><Text style={styles.levelEyebrow}>CURRENT RANK</Text><Text style={styles.levelTitle}>Level {level}</Text><Text style={styles.levelDetail}>{totalXp} lifetime XP · {totalCompleted} quests kept</Text></View>
+          <View><Text style={styles.levelEyebrow}>CURRENT RANK</Text><Text style={styles.levelTitle}>Level {level}</Text><Text style={styles.levelDetail}>{totalXp} lifetime XP · {totalCompleted} sessions recorded</Text></View>
           <View style={styles.levelBadge}><Text style={styles.levelBadgeNumber}>{Math.round(levelProgress * 250)}</Text><Text style={styles.levelBadgeLabel}>/250 XP</Text></View>
           <View style={styles.levelTrack}><View style={[styles.levelFill, { width: `${Math.max(2, levelProgress * 100)}%` }]} /></View>
         </Animated.View>
@@ -51,22 +52,16 @@ export default function ProgressRoute() {
           <View style={styles.quickCard}><Feather name="award" size={18} color="#FFCC66" /><Text style={styles.quickNumber}>{achievements.length}</Text><Text style={styles.quickLabel}>BADGES</Text></View>
         </View>
 
-        <Animated.View entering={FadeInDown.delay(220).duration(500)} style={styles.balanceCard}>
-          <View style={styles.balanceTop}><View><Text style={styles.balanceEyebrow}>WHOLE-PERSON BALANCE</Text><Text style={styles.balanceTitle}>{balanceScore}% aligned</Text></View><View style={styles.balanceBadge}><Feather name="compass" size={20} color="#4CD6B0" /></View></View>
-          <View style={styles.balanceTrack}><View style={[styles.balanceFill, { width: `${Math.max(2, balanceScore)}%` }]} /></View>
-          <Text style={styles.balanceBody}>{balanceScore >= 70 ? 'Your four paths are developing together. Keep the range.' : 'Your weakest path sets the score. Train breadth without abandoning your strength.'}</Text>
-        </Animated.View>
-
-        <SkillDashboard />
-        <AdaptiveInsight detailed />
+        <ShareProgress />
+        <ProgrammeDashboard />
         <Text style={styles.sectionTitle}>Momentum</Text>
         <MomentumChart points={weeklyXp} />
 
-        <View style={styles.sectionRow}><Text style={styles.sectionTitleInline}>Your attributes</Text><Text style={styles.sectionHint}>TAP TO EXPLORE</Text></View>
-        <View style={styles.attributeGrid}>{(Object.keys(TRACKS) as TrackKey[]).map((track, index) => <AttributeCard key={track} track={track} xp={trackXp(track)} selected={track === selectedTrack} index={index} hapticsEnabled={hapticsEnabled} onPress={() => setSelectedTrack(track)} />)}</View>
+        <View style={styles.sectionRow}><Text style={styles.sectionTitleInline}>Recorded XP</Text><Text style={styles.sectionHint}>TAP TO EXPLORE</Text></View>
+        <View style={styles.attributeGrid}>{(Object.keys(TRACKS) as TrackKey[]).filter((track) => track !== 'soul').map((track, index) => <AttributeCard key={track} track={track} xp={trackXp(track)} selected={track === selectedTrack} index={index} hapticsEnabled={hapticsEnabled} onPress={() => setSelectedTrack(track)} />)}</View>
         <Animated.View key={selectedTrack} entering={FadeInDown.duration(360)} style={[styles.attributeInsight, { borderColor: `${selected.color}45` }]}>
           <View style={[styles.insightIcon, { backgroundColor: `${selected.color}1C` }]}><Feather name={selected.icon} size={20} color={selected.color} /></View>
-          <View style={styles.insightCopy}><Text style={[styles.insightEyebrow, { color: selected.color }]}>{selected.label.toUpperCase()} SIGNAL</Text><Text style={styles.insightTitle}>{trackCompleted(selectedTrack)}/3 quests today</Text><Text style={styles.insightBody}>{selected.benefit}</Text></View>
+          <View style={styles.insightCopy}><Text style={[styles.insightEyebrow, { color: selected.color }]}>{selected.label.toUpperCase()} SIGNAL</Text><Text style={styles.insightTitle}>{trackCompleted(selectedTrack)} sessions today</Text><Text style={styles.insightBody}>{selected.benefit}</Text></View>
         </Animated.View>
 
         <View style={styles.sectionRow}><Text style={styles.sectionTitleInline}>Achievements</Text><Text style={styles.sectionHint}>{achievements.length} UNLOCKED</Text></View>

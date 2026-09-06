@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { emptyTraining, reduceTraining, type TrainingAction, type TrainingState } from '../lib/training-model';
+import { guidedPlan, nextGuided, refreshGuidedDrafts } from '../lib/guided-programmes';
 
 export type TrackKey = 'mind' | 'body' | 'soul' | 'freedom';
 export type Goal = 'discipline' | 'energy' | 'meaning' | 'autonomy';
@@ -51,6 +52,8 @@ export type OnboardingProfile = {
   coachingStyle: CoachingStyle;
   fastingPreference: FastingPreference;
   fastingSafety: FastingSafety;
+  businessRoute?: 'service' | 'saas' | 'app';
+  dietStyle?: 'plant' | 'vegetarian' | 'mixed';
 };
 
 export type Quest = {
@@ -272,11 +275,12 @@ function calculateStreak(dates: string[], today = todayKey()) {
 
 export function normalizeProfile(profile: OnboardingProfile | null | undefined): OnboardingProfile {
   if (!profile) return DEFAULT_PROFILE;
-  const focusTrack = TRACKS.includes(profile.focusTrack) ? profile.focusTrack : DEFAULT_PROFILE.focusTrack;
+  const activeTracks: TrackKey[] = TRACKS.filter((track) => track !== 'soul');
+  const focusTrack = activeTracks.includes(profile.focusTrack) ? profile.focusTrack : DEFAULT_PROFILE.focusTrack;
   const savedPriorities = Array.isArray(profile.priorityTracks)
-    ? profile.priorityTracks.filter((track): track is TrackKey => TRACKS.includes(track))
+    ? profile.priorityTracks.filter((track): track is TrackKey => activeTracks.includes(track))
     : [];
-  const priorityTracks = Array.from(new Set([focusTrack, ...savedPriorities, ...TRACKS])).slice(0, 2) as [TrackKey, TrackKey];
+  const priorityTracks = Array.from(new Set([focusTrack, ...savedPriorities, ...activeTracks])).slice(0, 2) as [TrackKey, TrackKey];
   const savedReadingStyle = profile.readingStyle as string | undefined;
   const readingStyle: ReadingStyle = savedReadingStyle === 'quick'
     ? 'practical'
@@ -291,6 +295,8 @@ export function normalizeProfile(profile: OnboardingProfile | null | undefined):
     focusTrack: priorityTracks[0],
     priorityTracks,
     readingStyle,
+    businessRoute: profile.businessRoute === 'saas' || profile.businessRoute === 'app' ? profile.businessRoute : 'service',
+    dietStyle: profile.dietStyle === 'plant' || profile.dietStyle === 'vegetarian' ? profile.dietStyle : 'mixed',
   };
 }
 
@@ -709,6 +715,12 @@ export function advanceProgressDay(current: ProgressState, date = new Date()): P
 }
 
 export function applyTrainingAction(current: ProgressState, action: TrainingAction): ProgressState {
+  if (action.type === 'start') {
+    const requested = action.challenge;
+    const expected = guidedPlan(current.profile, current.training, new Date(action.now)).find(c => c.quest.id === requested.quest.id && c.scope === requested.scope && !current.training.results.some(r => r.sessionKey === c.scope + ':' + c.quest.id));
+    if (!expected || expected.quest.id !== action.challenge.quest.id || expected.scope !== action.challenge.scope) return current;
+    action = { ...action, challenge: expected };
+  }
   if (action.type !== 'start' && action.type !== 'discard') {
     const challenge = current.training.sessions[action.key]?.challenge;
     if (challenge?.quest.track === 'body' && challenge.movementLimit !== normalizeProfile(current.profile).movementLimit) return current;
@@ -724,7 +736,11 @@ export function applyTrainingAction(current: ProgressState, action: TrainingActi
   if (next.completedToday.includes(result.questId)) return { ...next, training: { ...training, results: training.results.map((r) => r.sessionKey === result.sessionKey ? { ...r, xp: 0 } : r) } };
   const completedToday = [...next.completedToday, result.questId];
   const allPaths = TRACKS.every((track) => completedToday.some((id) => id.startsWith(TRACK_PREFIXES[track]) && !id.includes('-trait-')));
-  const bonus = allPaths && !next.dailyRewardDates.includes(date) ? 50 : 0;
+  const plan = guidedPlan(next.profile, training, now);
+  const planComplete = result.questId.includes('-programme-v1-')
+    ? plan.length > 0 && !nextGuided(plan, training)
+    : allPaths;
+  const bonus = planComplete && !next.dailyRewardDates.includes(date) ? 50 : 0;
   const award = result.xp + bonus;
   const previousXp = Object.values(next.xpByTrack).reduce((sum, xp) => sum + xp, 0);
   const newLevel = Math.floor((previousXp + award) / 250) + 1;
@@ -796,7 +812,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
           completionHistory,
           observedDates,
           dailyRewardDates: parsed.dailyRewardDates ?? [],
-          training: parsed.training?.version === 1 && parsed.training.sessions && Array.isArray(parsed.training.results) ? parsed.training : emptyTraining(),
+          training: parsed.training?.version === 1 && parsed.training.sessions && Array.isArray(parsed.training.results) ? refreshGuidedDrafts(parsed.training) : emptyTraining(),
         });
         storageLoaded.current = true;
       })

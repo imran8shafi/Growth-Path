@@ -8,21 +8,9 @@ import { getCycleProgress, useProgress } from '@/context/progress';
 import { specialChallenges } from '@/lib/training-catalog';
 import { dateKey, ROMAN, sessionKey, skillProgress, SKILLS, trainingLevel, type SkillKey } from '@/lib/training-model';
 import { nativeTheme } from '@/lib/native-theme';
+import { AchievementVault } from './achievement-vault';
 
-export function TrainingHighlights({ compact = false }: { compact?: boolean }) {
-  const { training, profile, planDate, cycleStartedAt } = useProgress(); const router = useRouter();
-  const cycle = getCycleProgress(cycleStartedAt, planDate);
-  const challenges = specialChallenges(profile, training, planDate, cycleStartedAt);
-  const drafts = Object.values(training.sessions).filter((session) => session.status === 'active');
-  return <View style={s.section}>
-    {drafts.length ? <><Text style={s.title}>Your unfinished missions</Text>{drafts.slice(0, compact ? 2 : 8).map((draft) => <Pressable key={draft.key} accessibilityRole="button" onPress={() => router.push(`/session?session=${encodeURIComponent(draft.key)}` as Href)} style={s.resume}><Feather name="play-circle" size={21} color="#55D6FF" /><View style={{ flex: 1 }}><Text style={s.label}>{draft.challenge.quest.title}</Text><Text style={s.small}>Stage {Math.min(draft.stageIndex + 1, draft.challenge.stages.length)} of {draft.challenge.stages.length} · saved draft</Text></View><Feather name="arrow-right" size={18} color="#91A7B8" /></Pressable>)}</> : null}
-    <Text style={s.title}>Chapter {cycle.chapterIndex + 1}: {cycle.chapter.title}</Text>
-    <Text style={s.body}>{cycle.day === 42 ? 'Your evolution checkpoint is here. Compare a repeatable test with your baseline.' : `Day ${cycle.day} of 42. ${cycle.chapter.detail} The chapter changes which skills lead your daily practice.`}</Text>
-    <View style={s.list}>{challenges.filter((c) => !compact || c.category === 'boss').map((challenge) => <TaskRow key={sessionKey(challenge)} {...challenge.quest} challenge={challenge} />)}</View>
-    <Text style={s.small}>Chapter challenge: learn → rehearse → act → reflect. Work through it at your pace this week.</Text>
-    {!compact ? <CycleComparison /> : null}
-  </View>;
-}
+export function TrainingHighlights({ compact = false }: { compact?: boolean }) { return compact ? null : <CycleComparison />; }
 
 function CycleComparison() {
   const { training, cycleStartedAt, planDate } = useProgress(); const cycle = getCycleProgress(cycleStartedAt, planDate);
@@ -57,6 +45,7 @@ export function SkillDashboard() {
   const max = Math.max(1, ...series.map((p) => p.metric.value));
   return <View style={s.section}>
     <Text style={s.title}>Your skill tree</Text><Text style={s.body}>Practice ranks grow across distinct days. Challenge difficulty responds separately to how sessions feel.</Text>
+
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chips} contentContainerStyle={{ gap: 8 }}>{(Object.keys(SKILLS) as SkillKey[]).map((key) => <Pressable key={key} accessibilityRole="tab" accessibilityState={{ selected: key === selected }} onPress={() => { setSelected(key); setProtocol(null); setSelectedPoint(null); }} style={[s.chip, selected === key && s.selected]}><Text style={s.label}>{SKILLS[key].label}</Text><Text style={s.small}>{ROMAN[skillProgress(key, training.results).level - 1]}</Text></Pressable>)}</ScrollView>
     <SpotlightCard color="#55D6FF" style={s.panel}>
       <View style={s.between}><View><Text style={s.kicker}>{info.track.toUpperCase()} / SKILL</Text><Text style={s.title}>{info.label}</Text></View><View style={s.rank}><Text style={s.big}>{ROMAN[progress.level - 1]}</Text><Text style={s.small}>PRACTICE</Text></View></View>
@@ -75,6 +64,7 @@ export function SkillDashboard() {
         {point && training.sessions[point.result.sessionKey] ? <Pressable accessibilityRole="button" onPress={() => router.push(`/session?session=${encodeURIComponent(point.result.sessionKey)}` as Href)} style={s.resume}><Text style={s.label}>Open this session</Text><Feather name="arrow-up-right" size={18} color="#55D6FF" /></Pressable> : null}
       </> : <Text style={s.body}>Complete a trial to record a measured score. Reflections, beliefs, humor, and writing quality are not given invented scores.</Text>}
     </SpotlightCard>
+    <AchievementVault />
     <View style={s.between}><Text style={s.title}>Recent training</Text><CountUpText value={training.results.length} suffix=" sessions" style={s.small} /></View>
     {!training.results.length ? <Text style={s.body}>Start any challenge. Your result will appear here after its final check-in.</Text> : [...training.results].reverse().slice(0, 8).map((result) => <Pressable key={result.sessionKey} accessibilityRole="button" disabled={!training.sessions[result.sessionKey]} onPress={() => router.push(`/session?session=${encodeURIComponent(result.sessionKey)}` as Href)} style={s.resume}><Feather name={result.category === 'boss' ? 'award' : 'check-circle'} size={19} color="#4CD6B0" /><View style={{ flex: 1 }}><Text style={s.label}>{result.title}</Text><Text style={s.small}>{result.date} · {SKILLS[result.skill].label} · {result.feedback === 'right' ? 'Right level' : result.feedback === 'hard' ? 'Too hard' : 'Too easy'}</Text></View><Text style={s.kicker}>+{result.xp}</Text></Pressable>)}
   </View>;
