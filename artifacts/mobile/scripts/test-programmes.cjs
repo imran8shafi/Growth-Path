@@ -72,6 +72,11 @@ assert.equal(reading.sessions[sessionKey(readQuest)].answers[readQuest.stages[0]
 assert.equal(stageValid(readQuest.stages[0], { acknowledged: true }), true, 'Reading has no minimum-time exam gate');
 assert.deepEqual(Array.from(plan.find(c => c.quest.track === 'body').stages.filter(s => s.demonstration).map(s => s.demonstration)), ['sit-stand', 'calf-raise']);
 const started = reduceTraining(emptyTraining(), { type: 'start', challenge: plan[0], now });
+const otherStarted = reduceTraining(emptyTraining(), { type: 'start', challenge: plan[2], now });
+assert.equal(sessionKey(programmes.suggestedGuided(plan, otherStarted)), sessionKey(plan[2]), 'Suggest resuming an active quest before starting another');
+assert.equal(sessionKey(programmes.suggestedGuided(plan, emptyTraining())), sessionKey(plan[0]), 'Use the assigned order when nothing is started');
+const allDone = plan.reduce((state, c) => solve(state, c), emptyTraining());
+assert.equal(programmes.suggestedGuided(plan, allDone), undefined, 'Completed plans never suggest extra work');
 const later = new Date(2026, 8, 12, 12);
 assert.equal(sessionKey(guidedPlan(profile, started, later)[0]), sessionKey(plan[0]), 'Missed days retain the unfinished assignment');
 const done = solve(emptyTraining(), plan[0]);

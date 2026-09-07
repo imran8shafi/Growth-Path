@@ -195,3 +195,7 @@ export function guidedPlan(p: OnboardingProfile | null, training: TrainingState,
   return [primary, ...rest].map((track) => programmeChallenge(track, p, training, date)).filter((c): c is Challenge => Boolean(c)).slice(0, count);
 }
 export function nextGuided(plan: Challenge[], training: TrainingState) { return plan.find((c) => !training.results.some((r) => r.sessionKey === sessionKey(c))); }
+export function suggestedGuided(plan: Challenge[], training: TrainingState) {
+  const available = plan.filter(c => !training.results.some(r => r.sessionKey === sessionKey(c)));
+  return available.find(c => training.sessions[sessionKey(c)]?.status === 'active') ?? available[0];
+}

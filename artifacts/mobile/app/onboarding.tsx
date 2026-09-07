@@ -21,7 +21,7 @@ const C = {
   cyan: '#55D6FF', blue: '#459BFF', green: '#4CD6B0', gold: '#FFCC66',
 };
 
-type Stage = 'intro' | 'questions' | 'analysis' | 'result' | 'commit' | 'ready';
+type Stage = 'intro' | 'questions' | 'result';
 type AnswerKey = keyof OnboardingProfile;
 type IconName = keyof typeof Feather.glyphMap;
 type Option = { value: string; label: string; detail: string; icon: IconName };
@@ -348,48 +348,6 @@ function QuestionScreen({ question, index, total, selected, direction, onSelect,
   );
 }
 
-const ANALYSIS_STEPS = [
-  { label: 'Reading your mind pattern', threshold: 12, icon: 'book-open' as IconName },
-  { label: 'Mapping energy and recovery', threshold: 28, icon: 'activity' as IconName },
-  { label: 'Checking your movement needs', threshold: 44, icon: 'shield' as IconName },
-  { label: 'Shaping your reading practice', threshold: 60, icon: 'sun' as IconName },
-  { label: 'Choosing your cross-training', threshold: 77, icon: 'shuffle' as IconName },
-  { label: 'Building your seven-day cycle', threshold: 94, icon: 'compass' as IconName },
-];
-
-function AnalysisScreen({ onDone }: { onDone: () => void }) {
-  const [percent, setPercent] = useState(1);
-  useEffect(() => {
-    const interval = setInterval(() => setPercent((current) => Math.min(100, current + (current < 70 ? 3 : 2))), 90);
-    return () => clearInterval(interval);
-  }, []);
-  useEffect(() => {
-    if (percent !== 100) return;
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const timeout = setTimeout(onDone, 750); return () => clearTimeout(timeout);
-  }, [onDone, percent]);
-  const status = percent < 30 ? 'Understanding your starting point' : percent < 62 ? 'Shaping your three paths' : percent < 92 ? 'Shaping your daily rhythm' : 'Your path is almost ready';
-  return (
-    <View style={styles.analysisScreen}>
-      <Animated.View entering={FadeInDown.duration(500)}>
-        <Text style={styles.analysisKicker}>BUILDING YOUR PATH</Text><Text style={styles.analysisPercent}>{percent}%</Text><Text style={styles.analysisTitle}>{status}</Text>
-      </Animated.View>
-      <View style={styles.analysisTrack}><View style={[styles.analysisFill, { width: `${percent}%` }]} /></View>
-      <Animated.View entering={FadeInUp.delay(180).duration(500)} style={styles.statusPanel}>
-        <Text style={styles.statusTitle}>Personalizing</Text>
-        {ANALYSIS_STEPS.map((item) => {
-          const complete = percent >= item.threshold;
-          return <View key={item.label} style={styles.statusRow}>
-            <View style={[styles.statusIcon, complete && styles.statusIconComplete]}><Feather name={complete ? 'check' : item.icon} size={14} color={complete ? C.bg : C.subtle} /></View>
-            <Text style={[styles.statusLabel, complete && styles.statusLabelComplete]}>{item.label}</Text>
-          </View>;
-        })}
-      </Animated.View>
-      <Text style={styles.analysisNote}>Your answers stay on this device.</Text>
-    </View>
-  );
-}
-
 const SCORE_META: Record<TrackKey, { label: string; icon: IconName; color: string }> = {
   mind: { label: 'Mind', icon: 'book-open', color: C.cyan }, body: { label: 'Body', icon: 'activity', color: C.green },
   soul: { label: 'Soul', icon: 'sun', color: C.gold }, freedom: { label: 'Financial Freedom', icon: 'key', color: C.blue },
@@ -402,7 +360,7 @@ function ResultScreen({ answers, onContinue }: { answers: Partial<OnboardingProf
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.resultScreen}>
       <Animated.View entering={FadeInDown.duration(520)}>
-        <View style={styles.completePill}><Feather name="check-circle" size={14} color={C.green} /><Text style={styles.completePillText}>PATH ANALYSIS COMPLETE</Text></View>
+        <View style={styles.completePill}><Feather name="check-circle" size={14} color={C.green} /><Text style={styles.completePillText}>YOUR PLAN IS READY</Text></View>
         <Text style={styles.resultTitle}>You do not need a new life.{`\n`}You need a clear next step.</Text>
         <Text style={styles.resultSubtitle}>Your first seven days combine reading, movement and a practical business project. Your main focus is {SCORE_META[focus].label.toLowerCase()}.</Text>
       </Animated.View>
@@ -411,45 +369,10 @@ function ResultScreen({ answers, onContinue }: { answers: Partial<OnboardingProf
         <View style={[styles.identityArrow, { backgroundColor: `${archetype.color}20` }]}><Feather name="arrow-right" size={17} color={archetype.color} /></View>
         <View style={[styles.identitySide, styles.identityNext]}><Text style={[styles.identityLabel, { color: archetype.color }]}>NEXT FORM</Text><Text style={styles.identityNextText}>{identity.next}</Text></View>
       </Animated.View>
-      <View style={styles.scoreList}>{[{ title: "Mind · From scattered input to a reading practice", detail: "Seven short reading sessions, with ideas about attention, judgment and responsibility to use in daily life." }, { title: "Body · From uncertainty to a repeatable routine", detail: "Two suitable movement sessions, a balanced meal template and a grocery plan. Adapt movements to your starting point." }, { title: "Financial Freedom · From an idea to useful evidence", detail: "A customer brief, a sample or prototype, and a small offer or build plan. These are milestones, not a promise of income." }].map(item => <View key={item.title} style={styles.scoreCard}><Text style={[styles.scoreLabel, { fontSize: 17 }]}>{item.title}</Text><Text style={[styles.resultSubtitle, { fontSize: 14 }]}>{item.detail}</Text></View>)}</View><Text style={styles.resultLegendText}>Your seven-day potential: concrete things you can build through practice. Your pace and results can vary; missed days simply carry forward.</Text>
-      <PrimaryButton label="See my first commitment" onPress={onContinue} icon="arrow-right" />
+      <View style={styles.scoreList}>{[{ title: "Mind · From scattered input to a reading practice", detail: "Seven short reading sessions, with ideas about attention, judgment and responsibility to use in daily life." }, { title: "Body · From uncertainty to a repeatable routine", detail: "Two suitable movement sessions, a balanced meal template and a grocery plan. Adapt movements to your starting point." }, { title: "Financial Freedom · From an idea to useful evidence", detail: "A sample post or simple demo, a supplied introduction, and a starter offer. These are milestones, not a promise of income." }].map(item => <View key={item.title} style={styles.scoreCard}><Text style={[styles.scoreLabel, { fontSize: 17 }]}>{item.title}</Text><Text style={[styles.resultSubtitle, { fontSize: 14 }]}>{item.detail}</Text></View>)}</View><Text style={styles.resultLegendText}>Your seven-day potential: concrete things you can build through practice. Your pace and results can vary; missed days simply carry forward.</Text>
+      <PrimaryButton label="Start today’s quests" onPress={onContinue} icon="arrow-right" />
     </ScrollView>
   );
-}
-
-function CommitmentScreen({ answers, onUnlock }: { answers: Partial<OnboardingProfile>; onUnlock: () => void }) {
-  const focus = (answers.focusTrack ?? 'mind') as TrackKey;
-  const time = answers.time === 'forty' ? '40 minutes' : answers.time === 'twenty' ? '20 minutes' : '10 minutes';
-  const hold = useSharedValue(0); const ring = useAnimatedStyle(() => ({ transform: [{ scale: 0.7 + hold.value * 0.3 }], opacity: 0.18 + hold.value * 0.65 }));
-  return (
-    <View style={styles.commitScreen}>
-      <Animated.View entering={FadeInDown.duration(520)} style={styles.commitCopy}>
-        <Text style={styles.commitKicker}>YOUR FIRST SEVEN DAYS</Text><Text style={styles.commitTitle}>Three paths.{`\n`}One more complete human.</Text>
-        <Text style={styles.commitSubtitle}>Begin with the seven-day foundation. On hard days, {time} is enough. Small actions make a new identity believable.</Text>
-      </Animated.View>
-      <Animated.View entering={FadeIn.delay(280).duration(600)} style={styles.promiseCard}>
-        <View style={[styles.promiseIcon, { backgroundColor: `${SCORE_META[focus].color}20` }]}><Feather name={SCORE_META[focus].icon} size={22} color={SCORE_META[focus].color} /></View>
-        <View style={styles.promiseCopy}><Text style={styles.promiseLabel}>BEGIN WITH {SCORE_META[focus].label.toUpperCase()}</Text><Text style={styles.promiseText}>Unlock today’s quests, choose where to begin, and follow the reading, movement and business guidance.</Text></View>
-      </Animated.View>
-      <Animated.View entering={FadeInUp.delay(420).duration(520)} style={styles.holdArea}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Begin your path"
-          onPressIn={() => { hold.value = withTiming(1, { duration: 950 }); }}
-          onPressOut={() => { cancelAnimation(hold); hold.value = withTiming(0, { duration: 180 }); }}
-          onPress={() => { hold.value = withSpring(1.08); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onUnlock(); }} style={styles.holdButton}>
-          <Animated.View style={[styles.holdRing, ring]} /><LinearGradient colors={[C.cyan, C.blue]} style={styles.holdCore}><Feather name="shield" size={35} color={C.bg} /></LinearGradient>
-        </Pressable>
-        <Text style={styles.holdLabel}>TAP TO BEGIN</Text><Text style={styles.holdHint}>Choose to return, even when the day is imperfect.</Text>
-      </Animated.View>
-    </View>
-  );
-}
-
-function ReadyScreen({ onDone }: { onDone: () => void }) {
-  useEffect(() => { const timeout = setTimeout(onDone, 1500); return () => clearTimeout(timeout); }, [onDone]);
-  return <View style={styles.readyScreen}><Animated.View entering={FadeIn.duration(450)}><BrandMark size={68} /></Animated.View>
-    <Animated.Text entering={FadeInUp.delay(250).duration(520)} style={styles.readyKicker}>EVOLUTION CYCLE UNLOCKED</Animated.Text>
-    <Animated.Text entering={FadeInUp.delay(420).duration(520)} style={styles.readyTitle}>Day one begins now.{`\n`}Become harder to limit.</Animated.Text>
-    <Animated.View entering={FadeIn.delay(650).duration(500)} style={styles.readyLine} /></View>;
 }
 
 export default function OnboardingRoute() {
@@ -460,7 +383,7 @@ export default function OnboardingRoute() {
   const question = questions[questionIndex];
   const selected = question?.key === 'priorityTracks' ? answers.priorityTracks : answers[question?.key] as string | undefined;
   const canContinue = question?.mode === 'ranked' ? Array.isArray(selected) && selected.length === 2 : Boolean(selected);
-  const next = () => { if (!canContinue) return; if (questionIndex === questions.length - 1) { setStage('analysis'); return; } setDirection(1); setQuestionIndex((i) => i + 1); };
+  const next = () => { if (!canContinue) return; if (questionIndex === questions.length - 1) { setStage('result'); return; } setDirection(1); setQuestionIndex((i) => i + 1); };
   const back = () => { if (questionIndex === 0) { setStage('intro'); return; } setDirection(-1); setQuestionIndex((i) => i - 1); };
   const selectAnswer = (value: string) => {
     if (question.key === 'priorityTracks') {
@@ -487,16 +410,13 @@ export default function OnboardingRoute() {
     const consistency = answers.momentumObstacle === 'narrow' ? 'steady' : answers.momentumObstacle === 'clarity' ? 'fresh' : 'inconsistent';
     const fastingSafety = answers.fastingPreference === 'off' ? 'blocked' : answers.fastingSafety ?? 'blocked';
     setProfile({ ...answers, consistency, fastingSafety, priorityTracks, focusTrack: priorityTracks[0] } as OnboardingProfile);
-    setStage('ready');
+    router.replace('/(tabs)');
   };
   return (
     <Background><View style={[styles.safeFrame, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 12 }]}>
       {stage === 'intro' ? <IntroScreen onStart={() => setStage('questions')} /> : null}
       {stage === 'questions' ? <QuestionScreen question={question} index={questionIndex} total={questions.length} selected={selected} direction={direction} onSelect={selectAnswer} onBack={back} onContinue={next} /> : null}
-      {stage === 'analysis' ? <AnalysisScreen onDone={() => setStage('result')} /> : null}
-      {stage === 'result' ? <ResultScreen answers={answers} onContinue={() => setStage('commit')} /> : null}
-      {stage === 'commit' ? <CommitmentScreen answers={answers} onUnlock={finish} /> : null}
-      {stage === 'ready' ? <ReadyScreen onDone={() => router.replace('/(tabs)')} /> : null}
+      {stage === 'result' ? <ResultScreen answers={answers} onContinue={finish} /> : null}
     </View></Background>
   );
 }

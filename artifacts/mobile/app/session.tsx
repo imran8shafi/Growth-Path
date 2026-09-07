@@ -11,12 +11,12 @@ import { useProgress } from '@/context/progress';
 import { ShareProgress } from '@/components/share-progress';
 import { GuidedAction } from '@/components/guided-action';
 import { ExerciseDemo } from '@/components/exercise-demo';
-import { personalBest, recallScore, ROMAN, SKILLS, skillProgress, stageValid, type Challenge, type Stage, type StageAnswer, type TrainingSession } from '@/lib/training-model';
+import { sessionKey, personalBest, recallScore, ROMAN, SKILLS, skillProgress, stageValid, type Challenge, type Stage, type StageAnswer, type TrainingSession } from '@/lib/training-model';
 import { nativeTheme } from '@/lib/native-theme';
 import { MagicRings } from '@/components/magic-rings';
 import { RecordingPlayback, StoryRecorder } from '@/components/story-recorder';
 import { newAchievements } from '@/lib/training-rewards';
-import { isGuided } from '@/lib/guided-programmes';
+import { guidedPlan, suggestedGuided, isGuided } from '@/lib/guided-programmes';
 
 function StageResources({ stage }: { stage: Stage }) {
   const [help, setHelp] = useState(false); const [error, setError] = useState('');
@@ -84,7 +84,7 @@ function StageContent({ stage, answer, onAnswer, running, onToggle, challenge, o
 }
 
 function Result({ session, resultKey }: { session?: TrainingSession; resultKey?: string }) {
-  const { training } = useProgress(); const router = useRouter(); const reduced = useReducedMotionPreference();
+  const { training, profile, planDate, dispatchTraining } = useProgress(); const router = useRouter(); const reduced = useReducedMotionPreference();
   const result = training.results.find((r) => r.sessionKey === (session?.key ?? resultKey))!;
   const historyAtResult = training.results.filter((r) => r.completedAt <= result.completedAt);
   const rank = skillProgress(result.skill, historyAtResult);
@@ -97,6 +97,28 @@ function Result({ session, resultKey }: { session?: TrainingSession; resultKey?:
     try { await Share.share({ message: `Jack of All — ${result.title}\nCompleted a ${result.category} in ${SKILLS[result.skill].label}. ${result.metrics.map((m) => `${m.label}: ${m.value} ${m.unit}`).join(' · ')}\nWhat are you practicing this week?` }); }
     catch { setShareError('Sharing did not open. Your result is still saved here.'); }
   };
+  const guided = Boolean(session?.challenge.programme || result.sessionKey.startsWith('programme:quests:'));
+  const daily = guidedPlan(profile, training, planDate);
+  const next = suggestedGuided(daily, training);
+  const complete = daily.filter(c => training.results.some(r => r.sessionKey === sessionKey(c))).length;
+  if (guided) return <View testID="session-result">
+    <View style={s.resultEmblem}><Feather name="check" size={44} color="#69DBD1" /></View>
+    <Text accessibilityRole="header" style={s.resultTitle}>{result.successful ? 'Quest complete' : 'Practice saved'}</Text>
+    <Text style={s.centerBody}>{result.title}</Text>
+    <CountUpText value={result.xp} prefix="+" suffix=" XP" style={s.xp} />
+    {result.metrics.map(metric => <Text key={metric.protocol} style={s.centerBody}>{metric.value} {metric.unit} · {metric.label}</Text>)}
+    <View style={s.feedback}>
+      <Text style={s.stageTitle}>{complete} of {daily.length} done today</Text>
+      <Text style={s.body}>{next ? `Up next: ${next.quest.title}` : 'Your daily plan is complete. Come back tomorrow for your next steps.'}</Text>
+      <Button label={next ? 'Next quest' : 'Back to Home'} onPress={() => {
+        if (!next) { router.replace('/'); return; }
+        dispatchTraining({ type: 'start', challenge: next, now: new Date().toISOString() });
+        router.replace(`/session?session=${encodeURIComponent(sessionKey(next))}` as Href);
+      }} />
+    </View>
+    <ShareProgress questTitle={result.title} />
+    {next ? <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={s.share}><Text style={s.muted}>Back to Home</Text></Pressable> : null}
+  </View>;
   return <View testID="session-result">
     <Animated.View entering={reduced ? undefined : ZoomIn.duration(850).springify()} style={s.resultScene}><MagicRings variant="orb" size={260} /><View style={s.orbMedal}><Feather name={rank.level > previousRank.level ? 'unlock' : 'award'} size={40} color="#F6FBFF" /></View></Animated.View>
     <DecryptedText text={!session?.challenge.programme && rank.level > previousRank.level ? 'NEW PRACTICE RANK' : 'RESULT RECORDED'} style={s.kickerCenter} />

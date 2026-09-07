@@ -36,9 +36,9 @@ export default function EvolveRoute() {
           <Text style={[s.kicker, { color: TRACKS[track].color, marginTop: 20 }]}>{quest ? 'YOUR CURRENT QUEST' : 'FOUNDATION COMPLETE'}</Text><Text style={s.quest}>{quest?.quest.title ?? 'Keep applying what you have learned.'}</Text>
         </Pressable>
         {expanded ? <View>
+          {quest ? <Pressable accessibilityRole="button" disabled={done(quest)} onPress={() => start(quest)} style={[s.button, done(quest) && { opacity: .5 }]}><Text style={s.buttonText}>{done(quest) ? 'Today’s quest completed' : training.sessions[sessionKey(quest)] ? 'Resume quest' : 'Start quest'}</Text></Pressable> : null}
           <Text style={[s.body, { marginVertical: 18 }]}>In your current programme</Text>
           {programmeUnits(track, profile).map((unit, i) => <View key={unit.title} style={s.unit}><Text style={s.number}>{String(i + 1).padStart(2, '0')}</Text><Text style={[s.quest, { flex: 1, marginTop: 0 }]}>{unit.title}</Text>{quest?.programme?.step === i + 1 ? <Text style={s.now}>NOW</Text> : null}</View>)}
-          {quest ? <Pressable accessibilityRole="button" disabled={done(quest)} onPress={() => start(quest)} style={[s.button, done(quest) && { opacity: .5 }]}><Text style={s.buttonText}>{done(quest) ? 'Today’s quest completed' : 'Continue today’s quest'}</Text></Pressable> : null}
         </View> : null}
       </View>;
     })}
