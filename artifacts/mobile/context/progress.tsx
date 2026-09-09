@@ -53,6 +53,7 @@ export type OnboardingProfile = {
   fastingPreference: FastingPreference;
   fastingSafety: FastingSafety;
   businessRoute?: 'service' | 'saas' | 'app';
+  businessNiche?: string;
   dietStyle?: 'plant' | 'vegetarian' | 'mixed';
 };
 
@@ -296,6 +297,7 @@ export function normalizeProfile(profile: OnboardingProfile | null | undefined):
     priorityTracks,
     readingStyle,
     businessRoute: profile.businessRoute === 'saas' || profile.businessRoute === 'app' ? profile.businessRoute : 'service',
+    businessNiche: typeof profile.businessNiche === 'string' && profile.businessNiche.trim() ? profile.businessNiche.trim().slice(0, 80) : 'Local cleaning businesses',
     dietStyle: profile.dietStyle === 'plant' || profile.dietStyle === 'vegetarian' ? profile.dietStyle : 'mixed',
   };
 }
@@ -721,7 +723,7 @@ export function applyTrainingAction(current: ProgressState, action: TrainingActi
     if (!expected || expected.quest.id !== action.challenge.quest.id || expected.scope !== action.challenge.scope) return current;
     action = { ...action, challenge: expected };
   }
-  if (action.type !== 'start' && action.type !== 'discard') {
+  if (action.type !== 'start' && action.type !== 'discard' && action.type !== 'workspace') {
     const challenge = current.training.sessions[action.key]?.challenge;
     if (challenge?.quest.track === 'body' && challenge.movementLimit !== normalizeProfile(current.profile).movementLimit) return current;
   }
@@ -737,7 +739,7 @@ export function applyTrainingAction(current: ProgressState, action: TrainingActi
   const completedToday = [...next.completedToday, result.questId];
   const allPaths = TRACKS.every((track) => completedToday.some((id) => id.startsWith(TRACK_PREFIXES[track]) && !id.includes('-trait-')));
   const plan = guidedPlan(next.profile, training, now);
-  const planComplete = result.questId.includes('-programme-v1-')
+  const planComplete = /-programme-v\d+-/.test(result.questId)
     ? plan.length > 0 && !nextGuided(plan, training)
     : allPaths;
   const bonus = planComplete && !next.dailyRewardDates.includes(date) ? 50 : 0;

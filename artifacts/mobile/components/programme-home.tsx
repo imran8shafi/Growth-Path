@@ -9,6 +9,7 @@ import { sessionKey, type Challenge } from '@/lib/training-model';
 import { ScreenShell, TRACKS } from './path-ui';
 import { AnimatedWords, StarBorder } from './motion-bits';
 import { LevelJourney } from './level-journey';
+import { StoicHeroArt } from './stoic-hero-art';
 
 export function ProgrammeHome() {
   const [open, setOpen] = useState(false); const router = useRouter();
@@ -23,8 +24,9 @@ export function ProgrammeHome() {
     <View style={s.row}><Text style={s.small}>{planDate.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</Text><Text style={s.accent}>LEVEL {level}</Text></View>
     <AnimatedWords text="Today’s quests" style={s.heading} />
     <Text style={s.body}>Read something worthwhile. Move your body. Build your financial future.</Text>
-    <StarBorder color="#55D6FF" style={{ marginTop: 22, borderRadius: 24 }}><LinearGradient colors={['#153449', '#161E35']} style={s.hero}>
-      <Text style={s.title}>{plan.length === 0 ? 'Foundation complete' : complete === plan.length ? 'Today’s quests complete' : 'A little stronger, every day.'}</Text>
+    <StarBorder color="#55D6FF" style={{ marginTop: 22, borderRadius: 24 }}><LinearGradient colors={['#153449', '#161E35']} style={[s.hero, s.artHero]}>
+      <StoicHeroArt variant="banner" />
+      <Text style={[s.title, s.heroTitle]}>{plan.length === 0 ? 'Foundation complete' : complete === plan.length ? 'Today’s quests complete' : 'A little stronger, every day.'}</Text>
       <Text style={s.body}>{complete} / {plan.length} complete{remaining.length ? ` · ${remaining.length} left today` : ''}</Text>
       <View accessibilityRole="progressbar" accessibilityLabel="Today’s quest progress" accessibilityValue={{ min: 0, max: plan.length || 1, now: complete }} style={s.track}><View style={{ height: '100%', backgroundColor: '#4CD6B0', width: `${plan.length ? complete / plan.length * 100 : 100}%` }} /></View>
       <Pressable accessibilityRole="button" onPress={() => plan.length ? setOpen(true) : router.push('/progress' as Href)} style={s.primary}><Text style={s.primaryText}>{!plan.length ? 'See my progress' : complete === plan.length ? 'View today’s results' : 'Unlock today’s quests'}</Text><Feather name="arrow-right" size={20} color="#07131F" /></Pressable>
@@ -53,6 +55,8 @@ const s = StyleSheet.create({
   body: { color: '#AAC0CF', fontSize: 14, lineHeight: 22, marginTop: 10 },
   small: { color: '#AAC0CF', fontSize: 12, lineHeight: 18 }, accent: { color: '#79DBEE', fontSize: 12, fontWeight: '700' },
   hero: { padding: 22, borderRadius: 23, backgroundColor: '#102334' },
+  artHero: { overflow: 'hidden', minHeight: 244 },
+  heroTitle: { maxWidth: '78%' },
   track: { height: 5, borderRadius: 5, backgroundColor: '#2D4053', overflow: 'hidden', marginTop: 18 },
   primary: { backgroundColor: '#65D9EE', minHeight: 56, borderRadius: 16, paddingHorizontal: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22 },
   primaryText: { fontSize: 16, fontWeight: '700', color: '#07131F' }, link: { minHeight: 54, justifyContent: 'center' },

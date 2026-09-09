@@ -1,10 +1,12 @@
 import type { OnboardingProfile, Quest, TrackKey, TraitKey } from '@/context/progress';
+import { canContact, emptyWorkspace, reduceWorkspace, type BusinessWorkspace, type Material, type WorkspaceAction } from './business-workspace';
+import { regionReviewed } from './calling-guidance';
 
 export type SkillKey = 'focus' | 'reasoning' | 'memory' | 'storytelling' | 'strength' | 'mobility' | 'composure' | 'conviction' | 'connection' | 'negotiation' | 'independence' | 'creativity' | 'wit' | 'adaptability' | 'practical';
 export type Mechanic = 'timer' | 'performance' | 'decision' | 'creation' | 'field' | 'skill' | 'boss';
 export type ChallengeCategory = 'quest' | 'trial' | 'mission' | 'boss';
 export type Feedback = 'easy' | 'right' | 'hard';
-type StageBase = { id: string; title: string; prompt: string; source?: { title: string; url: string }; help?: string; reading?: { passage: string; attribution: string }; demonstration?: 'sit-stand' | 'calf-raise' };
+type StageBase = { id: string; title: string; prompt: string; source?: { title: string; url: string }; help?: string; reading?: { passage: string; attribution: string }; demonstration?: 'sit-stand' | 'calf-raise' | 'wall-push' | 'biceps-curl'; material?: Material; workflow?: 'prospects' | 'call' | 'call-session'; practice?: boolean; restSeconds?: number };
 export type Stage = StageBase & (
   | { type: 'write'; minimum: number; placeholder?: string }
   | { type: 'choice'; options: { id: string; label: string; response: string; correct?: boolean }[] }
@@ -15,7 +17,7 @@ export type Stage = StageBase & (
   | { type: 'performance'; unit: string; maximum: number; variants: string[] }
   | { type: 'checklist'; items: string[] }
   | { type: 'lesson'; points: string[]; example: string; seconds?: number }
-  | { type: 'action'; steps: string[]; alternative: string }
+  | { type: 'action'; steps: string[]; alternative: string; seconds?: number }
   | { type: 'artifact'; fields: { id: string; label: string; example: string }[] }
   | { type: 'attention'; cues: string[]; target: string }
   | { type: 'values'; options: string[]; maximum: number }
@@ -25,7 +27,7 @@ export type Challenge = {
   secondarySkills?: SkillKey[]; level: number; stages: Stage[]; minutes: number;
   scope: string; cycle: number; cycleDay: number; reason: string;
   movementLimit?: OnboardingProfile['movementLimit'];
-  programme?: { title: string; step: number; total: number; outcome: string; next: string };
+  programme?: { title: string; step: number; total: number; outcome: string; next: string; contentVersion?: number; prerequisites?: string[]; sources?: string[] };
 };
 export type StageAnswer = {
   text?: string; option?: string; rating?: number; ideas?: string[]; checks?: number[];
@@ -47,7 +49,7 @@ export type TrainingResult = {
   successful: boolean; metrics: Metric[]; xp: number; completedAt: string;
   values?: string[];
 };
-export type TrainingState = { version: 1; sessions: Record<string, TrainingSession>; results: TrainingResult[] };
+export type TrainingState = { version: 1; sessions: Record<string, TrainingSession>; results: TrainingResult[]; workspace?: BusinessWorkspace };
 export const emptyTraining = (): TrainingState => ({ version: 1, sessions: {}, results: [] });
 export const SKILLS: Record<SkillKey, { label: string; track: TrackKey; icon: string; description: string; levels: string[] }> = {
   focus: { label: 'Focus', track: 'mind', icon: 'target', description: 'Protect one outcome from competing inputs.', levels: ['One clear outcome', 'Hold the boundary', 'Return after distraction', 'Recall and apply', 'Build a deep-work ritual'] },
@@ -96,7 +98,10 @@ export function trainingLevel(skill: SkillKey, profile: OnboardingProfile | null
 export function cleanAnswer(stage: Stage, input: StageAnswer): StageAnswer {
   const answer: StageAnswer = {};
   if (stage.type === 'artifact') answer.fields = Object.fromEntries(stage.fields.map((f) => [f.id, typeof input.fields?.[f.id] === 'string' ? input.fields[f.id].slice(0, 500) : '']));
-  if (stage.type === 'action') { answer.checks = [...new Set((input.checks ?? []).filter((n) => Number.isInteger(n) && n >= 0 && n < stage.steps.length))]; answer.alternative = input.alternative === true; }
+  if (stage.type === 'action') {
+    answer.checks = [...new Set((input.checks ?? []).filter((n) => Number.isInteger(n) && n >= 0 && n < stage.steps.length))]; answer.alternative = input.alternative === true;
+    if (stage.workflow) { answer.fields = Object.fromEntries(Object.entries(input.fields ?? {}).filter(([k]) => ['name', 'phone', 'source'].includes(k)).map(([k,v]) => [k, String(v).slice(0, 500)])); if (input.variant === 'practice') answer.variant = 'practice'; }
+  }
   if (stage.type === 'lesson') answer.acknowledged = input.acknowledged === true;
   if (stage.type === 'attention' && Array.isArray(input.attention)) answer.attention = input.attention.filter((v) => typeof v === 'boolean').slice(0, stage.cues.length);
   if (stage.type === 'values' && Array.isArray(input.values)) answer.values = [...new Set(input.values.filter((v) => stage.options.includes(v)))].slice(0, stage.maximum);
@@ -163,6 +168,7 @@ export function sessionResult(session: TrainingSession, now = new Date()): Train
 }
 
 export type TrainingAction =
+  | { type: 'workspace'; action: WorkspaceAction }
   | { type: 'start'; challenge: Challenge; now: string }
   | { type: 'answer'; key: string; answer: StageAnswer }
   | { type: 'recording'; key: string; stageId: string; recording?: StageAnswer['recording'] }
@@ -173,7 +179,37 @@ export type TrainingAction =
   | { type: 'discard'; key: string };
 
 export function sessionKey(challenge: Challenge) { return `${challenge.scope}:${challenge.quest.id}`; }
+export function workflowValid(stage: Stage, answer: StageAnswer | undefined, current: TrainingState, key: string) {
+  if (!stage.workflow) return true;
+  const w = current.workspace ?? emptyWorkspace();
+  if (stage.workflow === 'prospects') return w.prospects.length >= 3;
+  if (w.pending?.[key]) return false;
+  return answer?.variant === 'practice' || w.calls.some(c => c.sessionKey === key);
+}
 export function reduceTraining(current: TrainingState, action: TrainingAction): TrainingState {
+  if (action.type === 'workspace') {
+    const w = current.workspace ?? emptyWorkspace();
+    if (action.action.kind === 'begin-call') {
+      const a = action.action; const session = current.sessions[a.key]; const stage = session?.challenge.stages[session.stageIndex];
+      if (!session || session.status !== 'active' || !stage || !['call', 'call-session'].includes(stage.workflow ?? '') || !regionReviewed(w.region, w.origin) || !Number.isFinite(Date.parse(a.at)) || !canContact(w, a.prospectId) || !w.prospects.some(p => p.id === a.prospectId) || w.pending?.[a.key]) return current;
+      if (w.calls.filter(c => c.sessionKey === a.key).length >= (stage.workflow === 'call-session' ? 3 : 1)) return current;
+      if (w.windows?.[a.key] && Date.parse(a.at) - Date.parse(w.windows[a.key]) >= session.challenge.minutes * 60000) return current;
+    }
+    if (action.action.kind === 'call') {
+      const call = action.action.call; const session = current.sessions[call.sessionKey];
+      const stage = session?.challenge.stages[session.stageIndex];
+      if (!session || session.status !== 'active' || !stage || !['call', 'call-session'].includes(stage.workflow ?? '') || !regionReviewed(w.region, w.origin) || !Number.isFinite(Date.parse(call.at))) return current;
+      const prior = w.calls.filter(c => c.sessionKey === call.sessionKey);
+      if (prior.length >= (stage.workflow === 'call-session' ? 3 : 1)) return current;
+      if (w.pending?.[call.sessionKey]?.prospectId !== call.prospectId) return current;
+    }
+    if (action.action.kind === 'undo-call') {
+      const call = w.calls.find(c => c.id === (action.action as { id: string }).id);
+      if (!call || current.sessions[call.sessionKey]?.status !== 'active') return current;
+    }
+    const workspace = reduceWorkspace(w, action.action);
+    return workspace === w ? current : { ...current, workspace };
+  }
   if (action.type === 'start') {
     const key = sessionKey(action.challenge);
     if (current.sessions[key] || current.results.some((r) => r.sessionKey === key)) return current;
@@ -207,15 +243,16 @@ export function reduceTraining(current: TrainingState, action: TrainingAction): 
     }
     next = { ...session, answers: { ...session.answers, [stage.id]: { ...cleanAnswer(stage, action.answer), elapsed: old.elapsed } } };
   }
-  if (action.type === 'tick' && stage && ('seconds' in stage) && Number.isFinite(action.seconds)) {
+  if (action.type === 'tick' && stage && ('seconds' in stage || (stage.type === 'lesson' && stage.reading)) && Number.isFinite(action.seconds)) {
     const old = session.answers[stage.id] ?? {};
     next = { ...session, answers: { ...session.answers, [stage.id]: { ...old, elapsed: Math.min(stage.seconds ?? 3600, (old.elapsed ?? 0) + Math.max(0, Math.min(2, action.seconds))) } } };
   }
-  if (action.type === 'next' && stage && stageValid(stage, session.answers[stage.id])) next = { ...session, stageIndex: Math.min(session.challenge.stages.length, session.stageIndex + 1) };
+  if (action.type === 'next' && stage && stageValid(stage, session.answers[stage.id]) && workflowValid(stage, session.answers[stage.id], current, session.key)) next = { ...session, stageIndex: Math.min(session.challenge.stages.length, session.stageIndex + 1) };
   if (action.type === 'feedback' && ['easy', 'right', 'hard'].includes(action.value)) next = { ...session, feedback: action.value };
   if (action.type === 'finish') {
-    if (!sessionValid(session) || current.results.some((r) => r.sessionKey === action.key)) return current;
+    if (!sessionValid(session) || !session.challenge.stages.every(s => workflowValid(s, session.answers[s.id], current, session.key)) || current.results.some((r) => r.sessionKey === action.key)) return current;
     const result = sessionResult(session, new Date(action.now));
+    if (session.challenge.stages.some(s => s.workflow?.startsWith('call') && session.answers[s.id]?.variant === 'practice')) result.title = `Practice: ${result.title}`;
     next = { ...session, status: 'complete', completedAt: action.now };
     // Keep scores across evolution cycles; keep only the latest 60 completed transcripts.
     const completedKeys = Object.values(current.sessions).filter((s) => s.status === 'complete').sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? '')).slice(0, 59).map((s) => s.key);

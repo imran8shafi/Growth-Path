@@ -10,8 +10,10 @@ import { AnimatedWords, CountUpText, DecryptedText, SpotlightCard, StarBorder, u
 import { useProgress } from '@/context/progress';
 import { ShareProgress } from '@/components/share-progress';
 import { GuidedAction } from '@/components/guided-action';
+import { MaterialCard } from '@/components/material-card';
+import { BusinessWorkflow } from '@/components/business-workflow';
 import { ExerciseDemo } from '@/components/exercise-demo';
-import { sessionKey, personalBest, recallScore, ROMAN, SKILLS, skillProgress, stageValid, type Challenge, type Stage, type StageAnswer, type TrainingSession } from '@/lib/training-model';
+import { sessionKey, personalBest, recallScore, ROMAN, SKILLS, skillProgress, stageValid, workflowValid, type Challenge, type Stage, type StageAnswer, type TrainingSession } from '@/lib/training-model';
 import { nativeTheme } from '@/lib/native-theme';
 import { MagicRings } from '@/components/magic-rings';
 import { RecordingPlayback, StoryRecorder } from '@/components/story-recorder';
@@ -52,7 +54,14 @@ function StageContent({ stage, answer, onAnswer, running, onToggle, challenge, o
   const { training } = useProgress();
   const prior = training.results.flatMap((r) => r.metrics).filter((m) => m.protocol === `${challenge.quest.id}:v1:${stage.id}:L${challenge.level}:${answer.variant}`);
   const elapsed = answer.elapsed ?? 0;
-  if (stage.type === 'action' && challenge.programme) return <GuidedAction stage={stage} answer={answer} onAnswer={onAnswer} />;
+  if (stage.type === 'action' && challenge.programme) return <>
+    {stage.material ? <MaterialCard material={stage.material} /> : null}
+    {stage.restSeconds ? <><Text style={s.score}>{Math.max(0, stage.restSeconds - Math.floor(elapsed))}s</Text>{elapsed < stage.restSeconds ? <Button label={running ? 'Pause rest timer' : 'Start rest timer'} secondary onPress={onToggle} /> : <Text style={s.body}>Rest timer finished. Take longer if needed.</Text>}</> : null}
+    {stage.practice || answer.variant === 'practice' ? <><Text style={s.score}>{Math.floor(elapsed / 60)}:{String(Math.floor(elapsed % 60)).padStart(2, '0')}</Text><Button label={running ? 'Pause practice stopwatch' : 'Start practice stopwatch'} secondary onPress={onToggle} /></> : null}
+    {stage.workflow ? <BusinessWorkflow challenge={challenge} answer={answer} onAnswer={onAnswer} prospectsOnly={stage.workflow === 'prospects'} /> : null}
+    {answer.variant === 'practice' ? <Text style={s.body}>Practice version: say the supplied opener aloud twice with a fictional business. This saves practice, not a real call.</Text> : null}
+    <GuidedAction stage={answer.variant === 'practice' ? { ...stage, steps: ['Read the supplied opener.', 'Practise aloud with a fictional business.', 'Repeat once, including a polite end to the conversation.'] } : stage} answer={answer} onAnswer={onAnswer} />
+  </>;
   if (stage.type === 'artifact') return <View style={s.options}>{stage.fields.map((f) => <View key={f.id}><Text style={s.optionText}>{f.label}</Text><Text style={s.small}>Example: {f.example}</Text><TextInput accessibilityLabel={f.label} multiline maxLength={500} value={answer.fields?.[f.id] ?? ''} onChangeText={(text) => onAnswer({ fields: { ...answer.fields, [f.id]: text } })} placeholder="Your project detail" placeholderTextColor="#71899B" style={s.input} /></View>)}<Text style={s.small}>Use at least two characters per field. Your template is saved with this session.</Text></View>;
   if (stage.type === 'action') return <View style={s.options}>{stage.steps.map((step, index) => { const checked = answer.checks?.includes(index) ?? false; return <Pressable key={step} accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => onAnswer({ ...answer, alternative: false, checks: checked ? answer.checks?.filter((n) => n !== index) : [...(answer.checks ?? []), index] })} style={[s.option, checked && s.selected]}><Text style={s.optionText}>{index + 1}. {step}</Text><Feather name={checked ? 'check-square' : 'square'} color="#55D6FF" size={22} /></Pressable>; })}<Text style={s.small}>{answer.checks?.length ?? 0} of {stage.steps.length} actions completed. Mark only what you actually did.</Text><View style={s.feedback}><Text style={s.body}>{stage.alternative}</Text>{!stage.alternative.startsWith('Pause') ? <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: Boolean(answer.alternative) }} onPress={() => onAnswer({ ...answer, alternative: !answer.alternative })} style={s.option}><Text style={s.optionText}>I used the preparation alternative</Text><Feather name={answer.alternative ? 'check-square' : 'square'} size={22} color="#A998FF" /></Pressable> : null}</View></View>;
   if (stage.type === 'lesson' && stage.reading) return <View style={s.options}><Text selectable style={{ color: '#F6FBFF', fontSize: 23, lineHeight: 36 }}>{stage.reading.passage}</Text><Text style={s.small}>{stage.reading.attribution}</Text><Text style={s.body}>{stage.points.join(' ')}</Text><Text style={s.score}>{Math.floor(elapsed / 60)}:{String(Math.floor(elapsed % 60)).padStart(2, '0')}</Text><Button label={running ? 'Pause reading stopwatch' : 'Start reading stopwatch'} secondary onPress={onToggle} /><Text style={s.small}>Read at your pace. The stopwatch is a helper, not a test. It pauses when you leave the app.</Text><Pressable accessibilityRole='checkbox' accessibilityState={{ checked: Boolean(answer.acknowledged) }} onPress={() => onAnswer({ acknowledged: !answer.acknowledged })} style={s.option}><Text style={s.optionText}>I finished reading</Text><Feather name={answer.acknowledged ? 'check-circle' : 'circle'} size={22} color='#55D6FF' /></Pressable></View>;
@@ -192,7 +201,7 @@ export default function SessionRoute() {
           {!stage.reading && !stage.demonstration ? <StageResources key={`resources-${stage.id}`} stage={stage} /> : null}
           <StageContent key={stage.id} stage={stage} challenge={c} answer={session.answers[stage.id] ?? {}} running={running} onToggle={() => setRunning((v) => !v)} onCaptureBusy={setCaptureBusy} onRecordingSaved={(recording) => dispatchTraining({ type: 'recording', key, stageId: stage.id, recording })} onAnswer={(answer) => dispatchTraining({ type: 'answer', key, answer })} />
         </StarBorder>
-        {(!c.programme || stageValid(stage, session.answers[stage.id])) ? <Button label={c.programme && session.stageIndex === c.stages.length - 1 ? `Complete quest · +${c.quest.xp} XP` : 'Continue'} disabled={captureBusy || !stageValid(stage, session.answers[stage.id])} onPress={() => {
+        {(!c.programme || stageValid(stage, session.answers[stage.id])) ? <Button label={c.programme && session.stageIndex === c.stages.length - 1 ? `Complete quest · +${c.quest.xp} XP` : 'Continue'} disabled={captureBusy || !stageValid(stage, session.answers[stage.id]) || !workflowValid(stage, session.answers[stage.id], training, key)} onPress={() => {
           setRunning(false); dispatchTraining({ type: 'next', key });
           if (c.programme && session.stageIndex === c.stages.length - 1) { dispatchTraining({ type: 'feedback', key, value: 'right' }); dispatchTraining({ type: 'finish', key, now: new Date().toISOString() }); }
         }} /> : null}

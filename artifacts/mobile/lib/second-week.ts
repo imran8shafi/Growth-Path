@@ -1,0 +1,29 @@
+import type { GuidedUnit } from './lead-generation';
+// Elizabeth Carter (1717–1806), public-domain translation. Section references
+// checked against the Internet Classics Archive, 2026-09-07.
+const readings = [
+  ['20', 'Pause before reacting', 'For if you once gain time and respite, you will more easily command yourself.', 'A short pause can help you choose a response. This does not excuse another person’s harmful conduct.', 'Before sending an irritated message, read it once more and remove one accusation you cannot support.'],
+  ['29', 'Consider the whole commitment', 'In every affair consider what precedes and follows, and then undertake it.', 'A choice includes preparation and consequences, not only the attractive outcome.', 'Before accepting a new commitment, check your calendar and the time required to finish it.'],
+  ['33', 'Leave space to listen', 'Be for the most part silent, or speak merely what is necessary, and in few words.', 'Treat this as an invitation to listen, not a rule against speaking up.', 'In your next practical conversation, let the other person finish before you reply.'],
+  ['35', 'Stand by considered action', 'When you do anything from a clear judgment that it ought to be done, never shun the being seen to do it, even though the world should make a wrong supposition about it.', 'Examine the reasons for an action. Approval is not the only measure of whether it is worthwhile.', 'Complete one small responsibility you have delayed because it is unglamorous.'],
+  ['46', 'Put an idea into practice', 'Never call yourself a philosopher, nor talk a great deal among the unlearned about theorems, but act conformably to them.', 'An idea becomes useful through what you do with it.', 'Use one idea from this programme in the next decision you already need to make.'],
+  ['48', 'Notice your own progress', 'The condition and characteristic of a philosopher is, that he expects all hurt and benefit from himself.', 'Read this as responsibility for your own choices, not denial of outside help, injustice or circumstances.', 'Take responsibility in practice: correct one inaccurate detail or fulfil one promise today.'],
+  ['1', 'Return to what you can do', 'And then examine it by those rules which you have, and first, and chiefly, by this: whether it concerns the things which are in our own control, or those which are not;', 'Use the distinction as a tool. You can influence outcomes without controlling them.', 'Choose the next unfinished step in your saved project and do it before opening a new distraction.'],
+];
+export const secondWeekMind: GuidedUnit[] = readings.map(([section, title, passage, explanation, application]) => ({
+  title: `Read: ${title.toLowerCase()}`, outcome: explanation,
+  stages: [{ id: 'read', type: 'lesson', title: `The Enchiridion · Section ${section}`, prompt: '', points: [explanation], example: application, seconds: 3600, reading: { passage, attribution: `Epictetus · Enchiridion §${section} · Elizabeth Carter translation (public domain)` } }, { id: 'apply', type: 'action', title: 'Use it today', prompt: '', steps: [application], alternative: 'Return when you can take this action.' }],
+}));
+
+export function secondWeekBody(first: GuidedUnit[], protein: string, limited: boolean): GuidedUnit[] {
+  const task = (title: string, steps: string[]): GuidedUnit => ({ title, outcome: steps[0], stages: [{ id: 'apply', type: 'action', title, prompt: '', steps, alternative: 'Return when this fits your day.' }] });
+  return [
+    { ...first[0], title: 'Week two: repeat your familiar movements', stages: [...first[0].stages, ...(!limited ? [{ id: 'wall-push', type: 'action' as const, title: 'Learn a wall press-up', prompt: '', demonstration: 'wall-push' as const, source: { title: 'NHS · Strength exercises', url: 'https://www.nhs.uk/live-well/exercise/strength-exercises/' }, steps: ['Face a wall at arm’s length. Place palms flat at chest height, fingers pointing up.', 'Keep your body straight. Bend your elbows toward the wall, then gently push back. Try up to five comfortable repetitions.'], alternative: 'Return to your familiar movements if this does not suit you.' }] : [])] },
+    task('Take a comfortable walk', limited ? ['Choose a familiar, accessible route or comfortable movement you already use.', 'Move at a comfortable pace within your usual limits. A short session counts.', 'Stop if it hurts or feels unsuitable; rest and return another day.'] : ['Choose a short, familiar route with a safe surface.', 'Walk comfortably for a few minutes within your quest time budget. Short walks count.', 'Return at an easy pace. No distance or speed target is required.']),
+    task('Prepare ingredients for tomorrow', [`Choose one familiar meal with vegetables, ${protein}, and a suitable staple.`, 'Check labels for allergens and dietary requirements. Prepare only what you can store safely.', 'Refrigerate perishable ingredients promptly and follow their storage instructions.']),
+    task('Give your routine a recovery day', ['Take a break from the strength session today.', 'Prepare a comfortable place to rest and water to drink as usual.', 'Set out your chair and clear the floor for your next familiar movement session.']),
+    { ...first[4], title: 'Repeat the same comfortable strength session' },
+    task('Shop from your useful meal list', ['Check what remains in your cupboard and fridge.', `Keep vegetables, ${protein}, and familiar staples on your list. Remove ingredients you already have.`, 'Compare unit prices within your usual budget. Save the list; a purchase is not required.']),
+    task('Keep a routine you can repeat', ['Review your movement records using the same setup. A higher score is not required.', 'Keep one meal that suited your preferences and budget.', 'Schedule two familiar movement sessions with a recovery day between them.']),
+  ];
+}

@@ -12,7 +12,7 @@ let legacyState = reduceTraining(emptyTraining(), { type: 'start', challenge: le
 const readingKey = sessionKey(legacyReading);
 legacyState.sessions[readingKey].answers[legacyReading.stages[0].id] = { elapsed: 7 };
 const refreshed = programmes.refreshGuidedDrafts(legacyState);
-assert.equal(refreshed.sessions[readingKey].challenge.stages[0].seconds, 3600);
+assert.equal(refreshed.sessions[readingKey].challenge.stages[0].seconds, undefined);
 assert.equal(refreshed.sessions[readingKey].answers[legacyReading.stages[0].id].elapsed, 7);
 const ticked = reduceTraining(refreshed, { type: 'tick', key: readingKey, seconds: 1 });
 assert.equal(ticked.sessions[readingKey].answers[legacyReading.stages[0].id].elapsed, 8, 'Saved reading resumes its stopwatch');
@@ -21,8 +21,9 @@ function solve(state, c, feedback = 'right') {
   const key = sessionKey(c);
   state = reduceTraining(state, { type: 'start', challenge: c, now });
   for (const stage of c.stages) {
+    if (stage.workflow === 'prospects') for (let i = 0; i < 3; i++) state = reduceTraining(state, { type: 'workspace', action: { kind: 'prospect', prospect: { id: 'p' + i, name: 'Business ' + i, phone: '012345678' + i, source: 'https://example.com' } } });
     const answer = stage.type === 'lesson' ? { acknowledged: true }
-      : stage.type === 'action' ? { checks: stage.steps.map((_, i) => i) }
+      : stage.type === 'action' ? { checks: stage.steps.map((_, i) => i), ...(stage.workflow?.startsWith('call') ? { variant: 'practice' } : {}) }
       : stage.type === 'artifact' ? { fields: Object.fromEntries(stage.fields.map((f) => [f.id, f.example])) }
       : stage.type === 'performance' ? { variant: stage.variants[0], value: 5 }
       : stage.type === 'choice' ? { option: (stage.options.find((o) => o.correct) ?? stage.options[0]).id }
@@ -46,7 +47,7 @@ let total = 0;
 for (const route of ['service', 'saas', 'app']) for (const track of programmes.PROGRAMME_TRACKS) {
   const p = { ...profile, businessRoute: route };
   const units = programmeUnits(track, p);
-  assert.equal(units.length, 7);
+  assert.equal(units.length, track === 'freedom' && route !== 'service' ? 7 : 14);
   for (let step = 0; step < units.length; step++) {
     const prefix = programmeChallenge(track, p, emptyTraining(), date).quest.id.replace(/1$/, '');
     const previous = units.slice(0, step).map((_, i) => ({ questId: `${prefix}${i + 1}`, date: '2026-09-05', successful: true }));
@@ -70,7 +71,7 @@ let reading = reduceTraining(emptyTraining(), { type: 'start', challenge: readQu
 reading = reduceTraining(reading, { type: 'tick', key: sessionKey(readQuest), seconds: 1 });
 assert.equal(reading.sessions[sessionKey(readQuest)].answers[readQuest.stages[0].id].elapsed, 1);
 assert.equal(stageValid(readQuest.stages[0], { acknowledged: true }), true, 'Reading has no minimum-time exam gate');
-assert.deepEqual(Array.from(plan.find(c => c.quest.track === 'body').stages.filter(s => s.demonstration).map(s => s.demonstration)), ['sit-stand', 'calf-raise']);
+assert.deepEqual(Array.from(plan.find(c => c.quest.track === 'body').stages.filter(s => s.demonstration).map(s => s.demonstration)), ['sit-stand', 'wall-push']);
 const started = reduceTraining(emptyTraining(), { type: 'start', challenge: plan[0], now });
 const otherStarted = reduceTraining(emptyTraining(), { type: 'start', challenge: plan[2], now });
 assert.equal(sessionKey(programmes.suggestedGuided(plan, otherStarted)), sessionKey(plan[2]), 'Suggest resuming an active quest before starting another');
@@ -100,7 +101,7 @@ assert.equal(migrated.focusTrack, 'mind');
 assert.ok(!migrated.priorityTracks.includes('soul'));
 assert.ok(guidedPlan({ ...profile, focusTrack: 'soul', time: 'forty' }, emptyTraining(), date).every(c => c.quest.track !== 'soul'));
 assert.ok(JSON.stringify(programmeUnits('mind', profile)).includes('Take responsibility in practice'));
-const action = programmeUnits('body', profile)[0].stages.find((s) => s.type === 'action');
+const action = programmeUnits('body', profile)[0].stages.find((s) => s.type === 'action' && s.steps.length > 1);
 assert.equal(stageValid(action, { checks: [0] }), false);
 const template = { id: 'legacy-template', type: 'artifact', fields: [{ id: 'customer', label: 'Customer', example: 'Cafe' }] };
 assert.equal(stageValid(template, { fields: {} }), false);
@@ -116,7 +117,7 @@ for (const route of ['service', 'saas', 'app']) {
 const oldBusiness = reduceTraining(emptyTraining(), { type: 'start', challenge: { ...plan[0], stages: [template] }, now });
 oldBusiness.sessions[sessionKey(plan[0])].answers[template.id] = { fields: { customer: 'My existing work' } };
 const newBusiness = programmes.refreshGuidedDrafts(oldBusiness);
-assert.equal(newBusiness.sessions[sessionKey(plan[0])].challenge.stages[0].id, 'guided-action');
+assert.equal(newBusiness.sessions[sessionKey(plan[0])].challenge.stages[0].id, 'legacy-template');
 assert.equal(newBusiness.sessions[sessionKey(plan[0])].answers[template.id].fields.customer, 'My existing work');
 assert.deepEqual(newBusiness.results, oldBusiness.results, 'Simplifying a draft does not award XP or change results');
 assert.deepEqual(programmes.refreshGuidedDrafts(newBusiness), newBusiness);

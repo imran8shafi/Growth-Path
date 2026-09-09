@@ -1,0 +1,8 @@
+export const CALLING_GUIDANCE = {
+  UK: { label: 'United Kingdom', url: 'https://ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/guide-to-pecr/electronic-and-telephone-marketing/telephone-marketing/', text: 'Screen both TPS and CTPS and your own do-not-call list before calling. A public number is not permission. Identify yourself and the business purpose, display your number, and provide contact details on request. Respect every objection. Call during the business’s local opening hours.' },
+  US: { label: 'United States', url: 'https://www.ftc.gov/business-guidance/resources/complying-telemarketing-sales-rule', text: 'Business-to-business exemptions are limited. Verify that the number is a business line and check applicable state, FCC and do-not-call requirements first; a public mobile number may be personal. Identify yourself honestly, call during local business hours and honour opt-outs. Never make misleading earnings or results claims.' },
+  India: { label: 'India', url: 'https://www.trai.gov.in/what-spam-or-ucc', text: 'Do not use an ordinary ten-digit personal number for unsolicited commercial calling. TRAI requires the appropriate registered commercial communication arrangements and preference screening. Use the supplied practice today until your provider confirms a suitable setup.' },
+  Other: { label: 'Another region', url: '', text: 'Local calling guidance is not reviewed for this region yet. Complete the supplied practice today. Live calling remains unavailable here.' },
+} as const;
+export type CallingRegion = keyof typeof CALLING_GUIDANCE;
+export const regionReviewed = (region?: string, origin?: string) => (region === 'UK' || region === 'US') && region === origin;

@@ -27,6 +27,7 @@ function RootLayoutNav() {
         <Stack.Screen name="session" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="practice" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="programme-settings" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="exercise-videos" options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack.Protected>
       <Stack.Protected guard={!profile}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />

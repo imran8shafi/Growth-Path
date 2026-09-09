@@ -4,14 +4,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   FadeIn, FadeInDown, FadeInLeft, FadeInRight, FadeInUp,
   cancelAnimation, useAnimatedStyle, useSharedValue,
-  withDelay, withRepeat, withSequence, withSpring, withTiming,
+  withDelay, withSpring, withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagicRings } from '@/components/magic-rings';
+import { StoicHeroArt } from '@/components/stoic-hero-art';
 import { ARCHETYPE_META, getEvolutionIdentity, type OnboardingProfile, type TrackKey, useProgress } from '@/context/progress';
 import { nativeTheme } from '@/lib/native-theme';
 
@@ -44,7 +45,7 @@ const BASE_QUESTIONS: Question[] = [
   {
     key: 'archetype', pillar: 'YOUR NEXT FORM',
     title: 'Who are you becoming?',
-    subtitle: 'Choose the identity that should guide your first seven days.',
+    subtitle: 'Choose the identity that should guide your first two weeks.',
     options: [
       { value: 'guardian', label: 'The Guardian', detail: 'Capable, courageous, and responsible.', icon: 'shield' },
       { value: 'scholar', label: 'The Scholar', detail: 'Focused, thoughtful, and hard to mislead.', icon: 'book-open' },
@@ -224,21 +225,6 @@ function Background({ children }: { children: React.ReactNode }) {
   );
 }
 
-function BrandMark({ size = 76 }: { size?: number }) {
-  const pulse = useSharedValue(1);
-  useEffect(() => {
-    pulse.value = withRepeat(withSequence(withTiming(1.08, { duration: 1300 }), withTiming(1, { duration: 1300 })), -1);
-  }, [pulse]);
-  const motion = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
-  return (
-    <Animated.View style={[styles.brandGlow, { width: size + 36, height: size + 36, borderRadius: size }, motion]}>
-      <LinearGradient colors={[C.cyan, C.blue, C.green]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.brandMark, { width: size, height: size, borderRadius: size / 2 }]}>
-        <Feather name="compass" size={size * 0.46} color={C.bg} />
-      </LinearGradient>
-    </Animated.View>
-  );
-}
-
 function PrimaryButton({ label, onPress, disabled = false, icon }: { label: string; onPress: () => void; disabled?: boolean; icon?: IconName }) {
   const scale = useSharedValue(1);
   const motion = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -255,21 +241,14 @@ function PrimaryButton({ label, onPress, disabled = false, icon }: { label: stri
 }
 
 function IntroScreen({ onStart }: { onStart: () => void }) {
-  const satelliteStyles = [styles.constellation0, styles.constellation1, styles.constellation2, styles.constellation3];
+  const { height } = useWindowDimensions();
   return (
-    <View style={styles.introScreen}>
-      <Animated.View entering={FadeIn.duration(650)} style={styles.introVisual}>
-        <BrandMark />
-        <View style={styles.constellation}>
-          {(['book-open', 'activity', 'sun', 'key'] as IconName[]).map((icon, index) => (
-            <Animated.View key={icon} entering={FadeIn.delay(450 + index * 120).duration(500)} style={[styles.constellationDot, satelliteStyles[index]]}>
-              <Feather name={icon} size={14} color={index === 2 ? C.gold : C.cyan} />
-            </Animated.View>
-          ))}
-        </View>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.introScreen}>
+      <Animated.View entering={FadeIn.duration(650)} style={[styles.introVisual, { height: Math.min(430, Math.max(260, height * 0.43)) }]}>
+        <StoicHeroArt />
       </Animated.View>
       <Animated.View entering={FadeInUp.delay(250).duration(650)} style={styles.introCopy}>
-        <Text style={styles.brandKicker}>GROWTH PATH</Text>
+        <Text style={styles.brandKicker}>JACK OF ALL</Text>
         <Text style={styles.introTitle}>Become who your{`\n`}life is asking for.</Text>
         <Text style={styles.introSubtitle}>A daily path for your mind, body, and financial freedom.</Text>
       </Animated.View>
@@ -277,7 +256,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
         <PrimaryButton label="Build my path" onPress={onStart} icon="arrow-right" />
         <Text style={styles.microCopy}>About 3 minutes • No perfect answers</Text>
       </Animated.View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -362,14 +341,14 @@ function ResultScreen({ answers, onContinue }: { answers: Partial<OnboardingProf
       <Animated.View entering={FadeInDown.duration(520)}>
         <View style={styles.completePill}><Feather name="check-circle" size={14} color={C.green} /><Text style={styles.completePillText}>YOUR PLAN IS READY</Text></View>
         <Text style={styles.resultTitle}>You do not need a new life.{`\n`}You need a clear next step.</Text>
-        <Text style={styles.resultSubtitle}>Your first seven days combine reading, movement and a practical business project. Your main focus is {SCORE_META[focus].label.toLowerCase()}.</Text>
+        <Text style={styles.resultSubtitle}>Your first two weeks combine reading, movement and a practical business project. Your main focus is {SCORE_META[focus].label.toLowerCase()}.</Text>
       </Animated.View>
       <Animated.View entering={FadeInDown.delay(90).duration(520)} style={[styles.identityReveal, { borderColor: `${archetype.color}55` }]}>
         <View style={styles.identitySide}><Text style={styles.identityLabel}>CURRENT FORM</Text><Text style={styles.identityCurrent}>{identity.current}</Text></View>
         <View style={[styles.identityArrow, { backgroundColor: `${archetype.color}20` }]}><Feather name="arrow-right" size={17} color={archetype.color} /></View>
         <View style={[styles.identitySide, styles.identityNext]}><Text style={[styles.identityLabel, { color: archetype.color }]}>NEXT FORM</Text><Text style={styles.identityNextText}>{identity.next}</Text></View>
       </Animated.View>
-      <View style={styles.scoreList}>{[{ title: "Mind · From scattered input to a reading practice", detail: "Seven short reading sessions, with ideas about attention, judgment and responsibility to use in daily life." }, { title: "Body · From uncertainty to a repeatable routine", detail: "Two suitable movement sessions, a balanced meal template and a grocery plan. Adapt movements to your starting point." }, { title: "Financial Freedom · From an idea to useful evidence", detail: "A sample post or simple demo, a supplied introduction, and a starter offer. These are milestones, not a promise of income." }].map(item => <View key={item.title} style={styles.scoreCard}><Text style={[styles.scoreLabel, { fontSize: 17 }]}>{item.title}</Text><Text style={[styles.resultSubtitle, { fontSize: 14 }]}>{item.detail}</Text></View>)}</View><Text style={styles.resultLegendText}>Your seven-day potential: concrete things you can build through practice. Your pace and results can vary; missed days simply carry forward.</Text>
+      <View style={styles.scoreList}>{[{ title: "Mind · From scattered input to a reading practice", detail: "Fourteen short reading sessions, with ideas about attention, judgment and responsibility to use in daily life." }, { title: "Body · From uncertainty to a repeatable routine", detail: "Two weeks of suitable movement and recovery, a balanced meal template and a grocery plan. Adapt movements to your starting point." }, { title: "Financial Freedom · From an idea to useful evidence", detail: "A supplied lead-generation project with call practice and a pilot proposal, or an existing app/SaaS starter track. These are milestones, not a promise of income." }].map(item => <View key={item.title} style={styles.scoreCard}><Text style={[styles.scoreLabel, { fontSize: 17 }]}>{item.title}</Text><Text style={[styles.resultSubtitle, { fontSize: 14 }]}>{item.detail}</Text></View>)}</View><Text style={styles.resultLegendText}>Your two-week potential: concrete things you can build through practice. Your pace and results can vary; missed days simply carry forward.</Text>
       <PrimaryButton label="Start today’s quests" onPress={onContinue} icon="arrow-right" />
     </ScrollView>
   );
@@ -424,13 +403,9 @@ export default function OnboardingRoute() {
 const styles = StyleSheet.create({
   background: { flex: 1 }, safeFrame: { flex: 1, paddingHorizontal: 20 },
   orb: { position: 'absolute', width: 290, height: 290, borderRadius: 145 }, orbOne: { top: -100, right: -120, backgroundColor: '#168BB0' }, orbTwo: { bottom: -120, left: -130, backgroundColor: '#0A5578' },
-  brandGlow: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(85,214,255,0.09)', borderWidth: 1, borderColor: 'rgba(85,214,255,0.13)' },
-  brandMark: { alignItems: 'center', justifyContent: 'center', shadowColor: C.cyan, shadowOpacity: 0.42, shadowRadius: 24, shadowOffset: { width: 0, height: 0 } },
   primaryButtonWrap: { width: '100%' }, primaryButton: { minHeight: 56, width: '100%', borderRadius: 16, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9 },
   primaryButtonDisabled: { backgroundColor: '#233443' }, primaryButtonText: { color: C.bg, fontFamily: nativeTheme.typography.sans.bold, fontSize: 15 }, primaryButtonTextDisabled: { color: C.subtle },
-  introScreen: { flex: 1, justifyContent: 'space-between', paddingTop: 56, paddingBottom: 10 }, introVisual: { flex: 1, minHeight: 220, alignItems: 'center', justifyContent: 'center' },
-  constellation: { position: 'absolute', width: 250, height: 230 }, constellationDot: { position: 'absolute', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(13,28,42,0.92)', borderWidth: 1, borderColor: C.border },
-  constellation0: { left: 8, top: 40 }, constellation1: { right: 0, top: 52 }, constellation2: { left: 28, bottom: 10 }, constellation3: { right: 22, bottom: 4 },
+  introScreen: { flexGrow: 1, justifyContent: 'space-between', paddingTop: 8, paddingBottom: 10 }, introVisual: { width: '100%', maxWidth: 520, alignSelf: 'center', borderRadius: 26, overflow: 'hidden', marginBottom: 24 },
   introCopy: { alignItems: 'center', marginBottom: 40 }, brandKicker: { color: C.cyan, fontFamily: nativeTheme.typography.sans.bold, fontSize: 12, letterSpacing: 3.4, marginBottom: 15 },
   introTitle: { color: C.text, fontFamily: nativeTheme.typography.sans.extrabold, fontSize: 36, lineHeight: 42, letterSpacing: -1.2, textAlign: 'center' },
   introSubtitle: { color: C.muted, fontFamily: nativeTheme.typography.sans.regular, fontSize: 15, lineHeight: 23, textAlign: 'center', maxWidth: 310, marginTop: 16 }, introFooter: { gap: 13 }, microCopy: { color: C.subtle, textAlign: 'center', fontFamily: nativeTheme.typography.sans.medium, fontSize: 11 },

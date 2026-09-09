@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { ScreenShell } from '@/components/path-ui';
@@ -10,7 +10,7 @@ export default function ProgrammeSettings() {
   const [draft, setDraft] = useState(() => ({ ...normalizeProfile(profile), businessRoute: profile?.businessRoute ?? 'service', dietStyle: profile?.dietStyle ?? 'mixed' }));
   const [expanded, setExpanded] = useState<keyof OnboardingProfile | null>(null);
   const baseline = { ...normalizeProfile(profile), businessRoute: profile?.businessRoute ?? 'service', dietStyle: profile?.dietStyle ?? 'mixed' };
-  const changed = (['focusTrack', 'time', 'businessRoute', 'dietStyle'] as const).some(key => draft[key] !== baseline[key]);
+  const changed = (['focusTrack', 'time', 'businessRoute', 'dietStyle', 'businessNiche'] as const).some(key => draft[key] !== baseline[key]);
   const options = <K extends keyof OnboardingProfile>(key: K, title: string, values: [OnboardingProfile[K], string, string][]) => <View style={s.group}>
     <Pressable accessibilityRole="button" accessibilityState={{ expanded: expanded === key }} onPress={() => setExpanded(expanded === key ? null : key)} style={[s.option, { marginTop: 0 }]}>
       <View style={{ flex: 1 }}><Text style={s.label}>{title}</Text><Text style={s.body}>{values.find(([value]) => value === draft[key])?.[1]}</Text></View><Feather name={expanded === key ? 'chevron-up' : 'chevron-down'} size={22} color="#A998FF" />
@@ -20,6 +20,7 @@ export default function ProgrammeSettings() {
   return <ScreenShell><View style={s.page}><Pressable accessibilityRole="button" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={s.back}><Feather name="arrow-left" size={20} color="#F6FBFF" /><Text style={s.label}>Cancel</Text></Pressable><Text style={s.heading}>Your programme</Text><Text style={s.body}>Tap a setting to change it. Your current quest stays saved.</Text>
     {options('focusTrack', 'Your main goal', [['freedom', 'Financial Freedom', 'A business project with concrete milestones.'], ['mind', 'Think more clearly', 'Ideas applied to everyday decisions.'], ['body', 'Build physical foundations', 'Movement and practical nutrition.']])}
     {options('time', 'Your daily time', [['ten', 'About 10 minutes', 'Three short quests: read, move, build.'], ['twenty', 'About 20 minutes', 'A balanced mix across all three paths.'], ['forty', 'Up to 40 minutes', 'Three main sessions, about 30 minutes total.']])}
+    <View style={s.group}><Text style={s.label}>Your business niche</Text><TextInput accessibilityLabel="Business niche" value={draft.businessNiche ?? 'Local cleaning businesses'} maxLength={80} onChangeText={businessNiche => setDraft({ ...draft, businessNiche })} style={{ color: '#FFF', minHeight: 48, borderBottomWidth: 1, borderColor: '#456079' }} /><Text style={s.body}>Cleaning examples are supplied. Replace the niche in your saved templates.</Text></View>
     {options('businessRoute', 'Your Financial Freedom programme', [['service', 'Service business / SMMA', 'Recommended starting route: make a sample before buying tools.'], ['saas', 'SaaS', 'Validate a recurring problem, then specify one feature.'], ['app', 'Your own app', 'Test a workflow before building a full app.']])}
     {options('dietStyle', 'Your Body meal examples', [['mixed', 'Mixed diet', 'Plant and animal protein alternatives.'], ['vegetarian', 'Vegetarian', 'Plant foods and suitable dairy.'], ['plant', 'Plant-based', 'Beans and lentils as the example proteins.']])}
     <Text style={s.body}>Use suitable ingredients for your allergies and dietary needs.</Text>

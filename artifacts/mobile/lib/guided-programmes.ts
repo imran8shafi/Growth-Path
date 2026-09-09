@@ -1,3 +1,6 @@
+import { enrichBodyProgramme } from './body-training';
+import { leadGenerationUnits } from './lead-generation';
+import { secondWeekMind, secondWeekBody } from './second-week';
 import type { OnboardingProfile, TrackKey } from '@/context/progress';
 import { dateKey, sessionKey, type Challenge, type SkillKey, type Stage, type TrainingState } from './training-model';
 
@@ -14,48 +17,12 @@ const choice = (title: string, prompt: string, options: [string, string, boolean
 const artifact = (title: string, fields: [string, string, string][]): Stage => ({ id: 'build', type: 'artifact', title, prompt: 'Complete this template. It becomes part of your saved project, ready to reuse in the next assignment.', fields: fields.map(([id, label, example]) => ({ id, label, example })), help: 'Use the example as a pattern, then replace it with details from your own project. Short phrases are enough.' });
 
 export function businessUnits(route: 'service' | 'saas' | 'app'): Unit[] {
-  const service = route === 'service';
+  if (route === 'service') return leadGenerationUnits();
   const task = (title: string, steps: string[]): Unit => ({
     title, outcome: steps[0],
     stages: [{ id: 'guided-action', type: 'action', title, prompt: '', steps, alternative: 'Pause and come back when you are ready.' }],
   });
-  return service ? [
-    task('Make a sample café post', [
-      'Open a free design tool. Choose a square social-post template.',
-      'Use this sample: “Fresh coffee. A quieter start.” Add your own photo or a free-to-use coffee image.',
-      'Export the image to a folder called My business. Label it Sample. Your first portfolio piece is ready.',
-    ]),
-    task('Find three cafés to learn from', [
-      'Open the public social page of a nearby independent café.',
-      'Look for a post showing its menu or opening hours. Save the page to your bookmarks.',
-      'Repeat for two more cafés. These are your examples for tomorrow.',
-    ]),
-    task('Improve your sample', [
-      'Open your saved sample and one bookmarked café page.',
-      'Use a larger headline and one clear image. Keep the text readable on a phone.',
-      'Save the updated image in My business.',
-    ]),
-    task('Prepare your first introduction', [
-      'Open a new note in your My business folder.',
-      'Copy this starter: “Hi! I’m building a portfolio of café social posts. May I send you a sample for feedback?”',
-      'Add your name at the end. Save it for tomorrow.',
-    ]),
-    task('Ask for feedback once', [
-      'Choose one bookmarked café with a public business contact.',
-      'Send your saved introduction yourself. Wait for permission before sending the sample.',
-      'Save the conversation. One request is enough; respect a no.',
-    ]),
-    task('Prepare a small service offer', [
-      'Open a new note called My offer.',
-      'Copy this scope: “Three social posts using your photos. One round of changes. Final files ready to publish.”',
-      'Add “Price and delivery date agreed before work starts.” Save it beside your sample.',
-    ]),
-    task('Put your work together', [
-      'Open My business. Place your sample and offer in one folder.',
-      'Check spelling and whether the sample is easy to read on your phone.',
-      'Save the folder as your starter portfolio. Use it in your next customer conversation.',
-    ]),
-  ] : [
+  return [
     task(route === 'app' ? 'Sketch your first app' : 'Sketch your first SaaS tool', [
       'Use this starter project: a simple list that helps a tutor follow up on lesson enquiries.',
       'On paper, draw a list with three columns: Name, Next lesson, Follow-up date. Use fictional names.',
@@ -135,7 +102,15 @@ const readingMind: Unit[] = mind.map((unit, i) => ({
   ...unit, title: ['Read: what is in your control', 'Read: events and judgments', 'Read: appearances and character', 'Read: prepare your attention', 'Read: responding to setbacks', 'Read: acceptance and action', 'Revisit your first passage'][i],
   stages: [
     { ...lesson('The Enchiridion · Section ' + readingPassages[i][0], [readingPassages[i][2]], 'Read slowly. Take one useful idea into your day.', undefined), reading: { passage: readingPassages[i][1], attribution: 'Epictetus · The Enchiridion §' + readingPassages[i][0] + ' · Elizabeth Carter translation (public domain)' }, seconds: 3600 },
-    ...unit.stages.filter(stage => stage.type === 'action'),
+    ...(unit.stages.some(stage => stage.type === 'action') ? unit.stages.filter(stage => stage.type === 'action') : [action('Use the idea today', [[
+      'Take one practical step on an existing task.',
+      'Check one unanswered message neutrally before assuming what the sender meant.',
+      'Before trusting an advert, look for the wider customer outcomes, not just a testimonial.',
+      'Remove one distracting notification before your next work block.',
+      'Prepare the next task before opening a new distraction.',
+      'Correct one small mistake you are responsible for.',
+      'Check an original source before forwarding a claim.',
+    ][i]])]),
   ],
 }));
 
@@ -143,38 +118,32 @@ export const PROGRAMME_TRACKS: TrackKey[] = ['mind', 'body', 'freedom'];
 const colors = { mind: '#55D6FF', body: '#4CD6B0', soul: '#FFCC66', freedom: '#A998FF' };
 const skills: Record<TrackKey, SkillKey> = { mind: 'reasoning', body: 'strength', soul: 'conviction', freedom: 'independence' };
 export function programmeUnits(track: TrackKey, profile: OnboardingProfile | null) {
-  return track === 'mind' ? readingMind : track === 'body' ? bodyUnits(profile) : track === 'soul' ? [] : businessUnits(profile?.businessRoute ?? 'service');
+  if (track === 'mind') return [...readingMind, ...secondWeekMind];
+  if (track === 'body') {
+    const first = bodyUnits(profile);
+    const protein = profile?.dietStyle === 'plant' ? 'beans or lentils' : profile?.dietStyle === 'vegetarian' ? 'beans, lentils or suitable plain yogurt' : 'beans, lentils, eggs or another suitable protein';
+    return enrichBodyProgramme([...first, ...secondWeekBody(first, protein, Boolean(profile?.movementLimit && profile.movementLimit !== 'none'))], profile);
+  }
+  return track === 'soul' ? [] : profile?.businessRoute === 'saas' || profile?.businessRoute === 'app' ? businessUnits(profile.businessRoute) : leadGenerationUnits(profile?.businessNiche);
+
 }
 export function programmeTitle(track: TrackKey, profile: OnboardingProfile | null) {
-  return { mind: 'Clear thinking', body: 'Movement & everyday nutrition', soul: profile?.beliefs === 'faith' ? 'Faith in daily life' : 'Ethics in daily life', freedom: { service: 'Service business foundation', saas: 'SaaS foundation', app: 'App business foundation' }[profile?.businessRoute ?? 'service'] }[track];
+  return { mind: 'Clear thinking', body: 'Movement & everyday nutrition', soul: profile?.beliefs === 'faith' ? 'Faith in daily life' : 'Ethics in daily life', freedom: { service: 'Lead generation · 14 guided sessions', saas: 'SaaS foundation', app: 'App business foundation' }[profile?.businessRoute ?? 'service'] }[track];
 }
 function branch(track: TrackKey, p: OnboardingProfile | null) { return track === 'freedom' ? p?.businessRoute ?? 'service' : track === 'soul' ? p?.beliefs === 'faith' ? p.faithTradition ?? 'private' : 'ethics' : 'core'; }
 export const isGuided = (c: Challenge) => Boolean(c.quest.track !== 'soul' && c.programme && c.scope.startsWith('programme:quests:'));
-// Upgrade presentation in saved drafts without changing answers, stage IDs or awards.
-export function refreshGuidedDrafts(training: TrainingState): TrainingState {
-  return { ...training, sessions: Object.fromEntries(Object.entries(training.sessions).map(([key, session]) => {
-    if (session.status !== 'active' || !isGuided(session.challenge)) return [key, session];
-    if (session.challenge.quest.track === 'freedom' && !session.challenge.stages.some(s => s.id === 'guided-action')) {
-      const route = session.challenge.quest.id.includes('-saas-') ? 'saas' : session.challenge.quest.id.includes('-app-') ? 'app' : 'service';
-      const unit = businessUnits(route)[(session.challenge.programme?.step ?? 1) - 1];
-      if (unit) return [key, { ...session, stageIndex: 0, feedback: undefined, challenge: { ...session.challenge, stages: unit.stages, quest: { ...session.challenge.quest, title: unit.title, detail: unit.outcome }, programme: { ...session.challenge.programme!, outcome: unit.outcome } } }];
-    }
-    const stages = session.challenge.stages.map((stage) => {
-      const clean = (text: string) => text.replace(/ and follow any prescribed diet\./g, '.').replace(/clinician-approved/g, 'familiar, comfortable').replace(/already cleared/g, 'familiar and comfortable');
-      const updated = JSON.parse(JSON.stringify(stage, (_key, value) => typeof value === 'string' ? clean(value) : value)) as Stage;
-      return updated.type === 'lesson' && updated.reading ? { ...updated, seconds: updated.seconds ?? 3600, source: undefined } : updated;
-    });
-    return [key, { ...session, challenge: { ...session.challenge, stages } }];
-  })) };
-}
+// Saved challenges are immutable snapshots. New content applies only to new assignments.
+export function refreshGuidedDrafts(training: TrainingState): TrainingState { return training; }
 export function programmeChallenge(track: TrackKey, p: OnboardingProfile | null, training: TrainingState, date: Date): Challenge | undefined {
   if (track === 'soul') return undefined;
-  const units = programmeUnits(track, p); const route = branch(track, p); const prefix = `${track}-programme-v1-${route}-`;
+  const active = Object.values(training.sessions).find(s => isGuided(s.challenge) && s.challenge.quest.track === track && s.status === 'active');
+  if (active) return active.challenge;
+  const units = programmeUnits(track, p); const route = branch(track, p); const prefix = `${track}-programme-v${track === 'freedom' && route === 'service' ? 2 : 1}-${route}-`;
   // Freeze the assignment for the day; completing it never offers a second quest in its place.
   const today = Object.values(training.sessions).find((s) => isGuided(s.challenge) && s.challenge.quest.track === track && (dateKey(new Date(s.startedAt)) === dateKey(date) || training.results.some((r) => r.sessionKey === s.key && r.date === dateKey(date))));
   if (today) return today.challenge;
   const done = new Set(training.results.filter((r) => r.date < dateKey(date) && r.successful).map((r) => r.questId));
-  const index = units.findIndex((_, i) => !done.has(`${prefix}${i + 1}`));
+  let index = units.findIndex((_, i) => !done.has(`${prefix}${i + 1}`));
   if (index < 0) return undefined;
   const unit = units[index]; const questId = `${prefix}${index + 1}`;
   const old = Object.values(training.sessions).find((s) => isGuided(s.challenge) && s.challenge.quest.id === questId && s.status === 'active' && (track !== 'body' || s.challenge.movementLimit === (p?.movementLimit ?? 'none')));
@@ -183,16 +152,25 @@ export function programmeChallenge(track: TrackKey, p: OnboardingProfile | null,
   const scope = `programme:quests:${dateKey(date)}`;
   return { quest: { id: questId, track, title: unit.title, detail: unit.outcome, xp: 40, meta: '10 MIN · GUIDED', trackColor: colors[track], trackIcon: track === 'body' ? 'activity' : 'compass', kind: 'path' },
     skill: skills[track], mechanic: 'skill', category: 'quest', level: 1, minutes: p?.time === 'forty' ? 10 : p?.time === 'twenty' ? (track === 'freedom' ? 8 : 6) : (track === 'freedom' ? 4 : 3), scope, cycle: 1, cycleDay: index + 1,
-    movementLimit: p?.movementLimit ?? 'none', stages: unit.stages.map((stage) => stage.type === 'choice' ? ({ id: stage.id, type: 'lesson' as const, title: 'A useful example', prompt: stage.prompt, points: stage.options.filter(o => o.correct !== false).map(o => o.response), example: 'Use this guidance in your next real-world step. No answer or score is needed.' }) : stage).map((stage, i, stages) => ({ ...stage, id: stages.slice(0, i).some((earlier) => earlier.id === stage.id) ? `${stage.id}-${i}` : stage.id })),
+    movementLimit: p?.movementLimit ?? 'none', stages: unit.stages.map(stage => stage.type === 'action' && (stage.practice || stage.workflow === 'call' || stage.workflow === 'call-session') ? { ...stage, seconds: 3600 } : stage).map((stage) => stage.type === 'choice' ? ({ id: stage.id, type: 'lesson' as const, title: 'A useful example', prompt: stage.prompt, points: stage.options.filter(o => o.correct !== false).map(o => o.response), example: 'Use this guidance in your next real-world step. No answer or score is needed.' }) : stage).map((stage, i, stages) => ({ ...stage, id: stages.slice(0, i).some((earlier) => earlier.id === stage.id) ? `${stage.id}-${i}` : stage.id })),
     reason: `${programmeTitle(track, p)} · Assignment ${index + 1} of ${units.length}. Work at your pace; the time is an estimate, not a deadline.`,
-    programme: { title: programmeTitle(track, p), step: index + 1, total: units.length, outcome: unit.outcome, next: units[index + 1]?.title ?? 'Foundation complete. Continue applying your saved materials in daily life.' },
+    programme: { contentVersion: track === 'body' ? 3 : 2, prerequisites: index ? [prefix + index] : [], sources: track === 'mind' ? ['epictetus-carter'] : track === 'body' ? ['nhs-strength', 'nhs-walking', 'who-diet', 'anime-shreds-reviewed-structure'] : ['original-lead-curriculum', 'calling-guidance'], title: programmeTitle(track, p), step: index + 1, total: units.length, outcome: unit.outcome, next: units[index + 1]?.title ?? 'Foundation complete. Continue applying your saved materials in daily life.' },
   };
 }
 export function guidedPlan(p: OnboardingProfile | null, training: TrainingState, date: Date): Challenge[] {
   const primary = p?.focusTrack === 'soul' ? 'mind' : p?.focusTrack ?? 'mind'; const count = 3;
-  const prior = training.results.filter((r) => r.date < dateKey(date) && r.questId.includes('-programme-v1-'));
+  const prior = training.results.filter((r) => r.date < dateKey(date) && /-programme-v\d+-/.test(r.questId));
   const rest = PROGRAMME_TRACKS.filter((t) => t !== primary).sort((a, b) => prior.filter((r) => r.track === a).length - prior.filter((r) => r.track === b).length);
-  return [primary, ...rest].map((track) => programmeChallenge(track, p, training, date)).filter((c): c is Challenge => Boolean(c)).slice(0, count);
+  const tracks = [primary, ...rest];
+  const plan = tracks.map(track => programmeChallenge(track, p, training, date));
+  if (plan.every(c => !c)) return [];
+  // A finished path practises its existing foundation while another catches up.
+  // This keeps the daily mix at three without creating a missed-work backlog.
+  return plan.map((c, i): Challenge => {
+    if (c) return c;
+    const track = tracks[i]; const unit = programmeUnits(track, p).at(-1)!;
+    return { quest: { id: `${track}-programme-v1-maintenance-${dateKey(date)}`, track, title: `Keep practising: ${unit.title.toLowerCase()}`, detail: unit.outcome, xp: 40, meta: 'GUIDED PRACTICE', trackColor: colors[track], trackIcon: 'compass', kind: 'path' }, skill: skills[track], mechanic: 'skill', category: 'quest', level: 1, minutes: 3, scope: `programme:quests:${dateKey(date)}`, cycle: 1, cycleDay: programmeUnits(track, p).length, movementLimit: p?.movementLimit ?? 'none', stages: unit.stages, reason: 'Your foundation is complete. Reuse your saved work while the other paths catch up.', programme: { contentVersion: 2, title: programmeTitle(track, p), step: programmeUnits(track, p).length, total: programmeUnits(track, p).length, outcome: unit.outcome, next: 'Continue your remaining main quests.' } };
+  }).slice(0, count);
 }
 export function nextGuided(plan: Challenge[], training: TrainingState) { return plan.find((c) => !training.results.some((r) => r.sessionKey === sessionKey(c))); }
 export function suggestedGuided(plan: Challenge[], training: TrainingState) {
